@@ -1,36 +1,17 @@
 import { LGS_SUBJECTS } from '../../lgsExam';
 import { formatReportDate } from './formatReport';
 
-/** @param {import('../reportSchemas').SubjectStat[]} subjects @param {string} code */
-function findSubject(subjects, code) {
-  return subjects?.find((s) => s.code === code) ?? null;
+/** ISO dates from the database become dd.mm.yyyy; anything already formatted is left alone. */
+function fmtDate(value) {
+  if (!value) return '';
+  return /^\d{4}-\d{2}-\d{2}/.test(String(value)) ? formatReportDate(String(value).slice(0, 10)) : String(value);
 }
 
-/** @param {any[]} subjectResults @param {string} studentId @param {string} code */
-function aggregateSubject(subjectResults, studentId, code) {
-  const rows = subjectResults.filter((r) => r.student_id === studentId && r.subject_code === code);
-  if (!rows.length) return null;
-  const def = LGS_SUBJECTS.find((s) => s.code === code);
-  const correct = rows.reduce((s, r) => s + (Number(r.correct_count) || 0), 0) / rows.length;
-  const wrong = rows.reduce((s, r) => s + (Number(r.wrong_count) || 0), 0) / rows.length;
-  const blank = rows.reduce((s, r) => s + (Number(r.blank_count) || 0), 0) / rows.length;
-  const net = rows.reduce((s, r) => s + (Number(r.net) || 0), 0) / rows.length;
-  return {
-    code,
-    label: def?.label ?? code,
-    shortLabel: def?.shortLabel,
-    ss: def?.questions ?? 0,
-    correct: Math.round(correct * 10) / 10,
-    wrong: Math.round(wrong * 10) / 10,
-    blank: Math.round(blank * 10) / 10,
-    net: Math.round(net * 100) / 100,
-    examCount: rows.length,
-  };
-}
-
-/** @param {import('../reportSchemas').ExamPdfModel} report */
+/** @param {import('../reportSchemas').ExamPdfModel | any} report */
 export function toExamPdfModel(report) {
   switch (report.type) {
+    case 'exam_results':
+      return toExamResultsPdfModel(report);
     case 'class_combined':
       return toClassCombinedPdfModel(report);
     case 'question_frequency':
@@ -46,33 +27,87 @@ export function toExamPdfModel(report) {
   }
 }
 
+function mapSubjectRows(subjects) {
+  return (subjects ?? []).map((subject) => ({
+    code: subject.code ?? subject.subject_code,
+    correct: subject.correct ?? subject.correct_count ?? null,
+    wrong: subject.wrong ?? subject.wrong_count ?? null,
+    blank: subject.blank ?? subject.blank_count ?? null,
+    net: subject.net ?? null,
+  }));
+}
+
+function mapTotals(source) {
+  return {
+    totalCorrect: source?.totalCorrect ?? source?.total_correct ?? null,
+    totalWrong: source?.totalWrong ?? source?.total_wrong ?? null,
+    totalBlank: source?.totalBlank ?? source?.total_blank ?? null,
+    totalNet: source?.totalNet ?? source?.total_net ?? null,
+    lgsScore: source?.lgsScore ?? source?.lgs_score ?? null,
+  };
+}
+
+function mapAverages(averages) {
+  return {
+    subjects: mapSubjectRows(averages?.subjects),
+    ...mapTotals(averages),
+    participantCount: averages?.participantCount ?? null,
+  };
+}
+
+/** @param {any} report */
+export function toExamResultsPdfModel(report) {
+  return {
+    type: 'exam_results',
+    header: {
+      schoolName: report.schoolName ?? 'Okul',
+      sessionTitle: report.sessionTitle ?? '',
+      sessionDate: fmtDate(report.sessionDate),
+      scopeLabel: report.scopeLabel,
+      reportDate: formatReportDate(new Date()),
+    },
+    participantCount: report.participantCount ?? report.rows?.length ?? 0,
+    topScore: report.topScore ?? null,
+    averages: mapAverages(report.averages),
+    rows: (report.rows ?? []).map((row) => ({
+      rank: row.rank,
+      studentName: row.studentName,
+      classLabel: row.classLabel ?? '—',
+      grade: row.grade ?? null,
+      subjects: mapSubjectRows(row.subjects),
+      ...mapTotals(row),
+      ranks: { school: row.ranks?.school, class: row.ranks?.class, grade: row.ranks?.grade },
+    })),
+  };
+}
+
 /** @param {any} report */
 export function toClassCombinedPdfModel(report) {
   return {
     type: 'class_combined',
     header: {
       schoolName: report.schoolName ?? 'Okul',
-      reportTitle: 'SINAVZA SINIF BAZINDA BİRLEŞTİRİLMİŞ KARNE',
-      classLabel: report.classLabel ?? '—',
+      scopeLabel: report.classLabel ?? report.scopeLabel,
       examType: 'LGS',
       reportDate: formatReportDate(new Date()),
     },
+    topicCoverage: report.topicCoverage ?? null,
     exams: (report.examSummaries ?? []).map((row) => ({
       order: row.order,
       title: row.title,
-      heldOn: row.heldOn,
+      heldOn: fmtDate(row.heldOn),
       participants: row.participants,
       avgNet: row.avgNet,
+      avgScore: row.avgScore ?? null,
     })),
     topics: (report.topicRows ?? []).map((row) => ({
       label: row.topicLabel ?? row.label,
-      level: row.level ?? 0,
+      subjectCode: row.subject_code ?? row.subjectCode,
       ss: row.attempts ?? row.ss ?? 0,
       correct: row.correct ?? 0,
       wrong: row.wrong ?? 0,
       blank: row.blank ?? 0,
       successRate: row.successRate ?? 0,
-      subjectCode: row.subject_code,
     })),
   };
 }
@@ -85,7 +120,7 @@ export function toQuestionFrequencyPdfModel(report) {
     if (!bySubject.has(code)) {
       bySubject.set(code, {
         subjectCode: code,
-        subjectLabel: LGS_SUBJECTS.find((s) => s.code === code)?.label ?? code,
+        subjectLabel: LGS_SUBJECTS.find((subject) => subject.code === code)?.label ?? code,
         rows: [],
       });
     }
@@ -110,8 +145,8 @@ export function toQuestionFrequencyPdfModel(report) {
     type: 'question_frequency',
     header: {
       schoolName: report.schoolName ?? 'Okul',
-      sessionTitle: report.sessionTitle ?? 'SORU FREKANS ANALİZİ',
-      classLabel: report.classLabel ?? '—',
+      sessionTitle: report.sessionTitle ?? 'Soru frekans analizi',
+      scopeLabel: report.classLabel ?? report.scopeLabel,
       reportDate: formatReportDate(new Date()),
     },
     sections: [...bySubject.values()],
@@ -133,49 +168,16 @@ export function toStudentAllExamsPdfModel(report) {
     exams: (report.exams ?? []).map((exam) => ({
       order: exam.order,
       title: exam.title,
-      heldOn: exam.heldOn,
-      subjects: (exam.subjects ?? []).map((s) => ({
-        code: s.code,
-        label: s.label,
-        shortLabel: s.shortLabel,
-        ss: s.ss ?? s.questions,
-        correct: s.correct ?? s.correct_count,
-        wrong: s.wrong ?? s.wrong_count,
-        blank: s.blank ?? s.blank_count,
-        net: s.net,
-      })),
-      totalCorrect: exam.totalCorrect ?? exam.total_correct,
-      totalWrong: exam.totalWrong ?? exam.total_wrong,
-      totalBlank: exam.totalBlank ?? exam.total_blank,
-      totalNet: exam.totalNet ?? exam.total_net,
-      lgsScore: exam.lgsScore ?? exam.lgs_score,
+      heldOn: fmtDate(exam.heldOn),
+      subjects: mapSubjectRows(exam.subjects),
+      ...mapTotals(exam),
       ranks: {
-        general: exam.schoolRank ?? exam.ranks?.general,
         school: exam.schoolRank ?? exam.ranks?.school,
         class: exam.classRank ?? exam.ranks?.class,
         grade: exam.gradeRank ?? exam.ranks?.grade,
-        lgs21: exam.ranks?.lgs21,
-        lgs20: exam.ranks?.lgs20,
-        lgs22: exam.ranks?.lgs22,
       },
     })),
-    averages: {
-      subjects: (report.averages?.subjects ?? []).map((s) => ({
-        code: s.code,
-        label: s.label,
-        shortLabel: s.shortLabel,
-        ss: s.ss ?? s.questions,
-        correct: s.correct,
-        wrong: s.wrong,
-        blank: s.blank,
-        net: s.net,
-      })),
-      totalCorrect: report.averages?.totalCorrect,
-      totalWrong: report.averages?.totalWrong,
-      totalBlank: report.averages?.totalBlank,
-      totalNet: report.averages?.totalNet,
-      lgsScore: report.averages?.lgsScore,
-    },
+    averages: mapAverages(report.averages),
   };
 }
 
@@ -185,28 +187,19 @@ export function toClassAveragePdfModel(report) {
     type: 'class_average',
     header: {
       schoolName: report.schoolName ?? 'Okul',
-      reportTitle: 'LGS SINIF ORTALAMA LİSTESİ',
       sessionTitle: report.sessionTitle,
-      sessionDate: report.sessionDate,
+      sessionDate: fmtDate(report.sessionDate),
+      scopeLabel: report.scopeLabel,
       reportDate: formatReportDate(new Date()),
     },
-    schoolAverages: mapSchoolAverages(report.schoolAverages),
+    schoolAverages: mapAverages(report.schoolAverages),
     classRows: (report.classRows ?? []).map((row) => ({
       rank: row.rank,
       classLabel: row.classLabel,
+      participantCount: row.participantCount ?? row.studentCount,
       studentCount: row.studentCount,
       subjects: mapSubjectRows(row.subjects),
-      totalCorrect: row.totalCorrect,
-      totalWrong: row.totalWrong,
-      totalBlank: row.totalBlank,
-      totalNet: row.totalNet,
-      lgsScore: row.lgsScore,
-      ranks: {
-        general: row.avgSchoolRank ?? row.ranks?.general,
-        school: row.ranks?.school,
-        class: row.ranks?.class,
-        grade: row.ranks?.grade,
-      },
+      ...mapTotals(row),
     })),
   };
 }
@@ -215,59 +208,27 @@ export function toClassAveragePdfModel(report) {
 export function toMultiExamAveragePdfModel(report) {
   return {
     type: 'multi_exam_average',
-    variant: report.variant ?? 'full',
     header: {
       schoolName: report.schoolName ?? 'Okul',
-      reportTitle: 'LGS PUAN ORTALAMA LİSTESİ',
+      scopeLabel: report.scopeLabel,
       reportDate: formatReportDate(new Date()),
     },
-    sessions: (report.sessions ?? []).map((s) => ({
-      order: s.order,
-      title: s.title,
-      heldOn: s.heldOn,
+    sessions: (report.sessions ?? []).map((session) => ({
+      order: session.order,
+      title: session.title,
+      heldOn: fmtDate(session.heldOn),
+      avgScore: session.avgScore ?? null,
+      avgNet: session.avgNet ?? null,
     })),
-    schoolAverages: mapSchoolAverages(report.schoolAverages),
+    schoolAverages: mapAverages(report.schoolAverages),
     rows: (report.rows ?? []).map((row) => ({
       rank: row.rank,
       classLabel: row.classLabel ?? '—',
       studentName: row.student?.full_name ?? row.studentName ?? '—',
+      examCount: row.examCount ?? null,
       subjects: mapSubjectRows(row.subjects),
-      totalCorrect: row.totalCorrect,
-      totalWrong: row.totalWrong,
-      totalBlank: row.totalBlank,
-      totalNet: row.totalNet,
-      lgsScore: row.lgsScore,
-      ranks: row.ranks ?? {},
+      ...mapTotals(row),
+      examScores: row.examScores ?? [],
     })),
   };
 }
-
-function mapSchoolAverages(avgs) {
-  if (!avgs) {
-    return { subjects: [], totalCorrect: null, totalWrong: null, totalBlank: null, totalNet: null, lgsScore: null };
-  }
-  return {
-    subjects: mapSubjectRows(avgs.subjects),
-    totalCorrect: avgs.totalCorrect,
-    totalWrong: avgs.totalWrong,
-    totalBlank: avgs.totalBlank,
-    totalNet: avgs.totalNet,
-    lgsScore: avgs.lgsScore,
-  };
-}
-
-function mapSubjectRows(subjects) {
-  return (subjects ?? []).map((s) => ({
-    code: s.code ?? s.subject_code,
-    label: s.label,
-    shortLabel: s.shortLabel,
-    ss: s.ss ?? s.question_count ?? s.questions,
-    correct: s.correct ?? s.correct_count,
-    wrong: s.wrong ?? s.wrong_count,
-    blank: s.blank ?? s.blank_count,
-    net: s.net,
-    examCount: s.examCount,
-  }));
-}
-
-export { aggregateSubject, findSubject };

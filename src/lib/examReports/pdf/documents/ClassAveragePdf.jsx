@@ -1,135 +1,123 @@
-import { Document, Page, Text, View } from '@react-pdf/renderer';
+import { Document, Page, View } from '@react-pdf/renderer';
 import { LGS_SUBJECTS } from '../../../lgsExam';
-import { chunkRows, formatNum, formatReportDateTime } from '../formatReport';
-import { CHART_COLORS, DonutChart, SubjectNetChart } from '../PdfCharts';
-import { PdfFooter, PdfTable } from '../PdfTable';
-import { ReportHeader } from '../ReportHeader';
-import {
-  buildAverageSummaryRow,
-  buildRankingColumns,
-  buildRankingHeaderRows,
-  buildSubjectDYNColumns,
-  buildSubjectHeaderRows,
-  LGS_SUBJECT_PDF_SHORT_LABELS,
-} from '../SubjectGridHeader';
-import { baseStyles, chartStyles } from '../styles';
+import { formatNum, formatReportDateTime } from '../formatReport';
+import { BarListCard, CHART, DonutCard } from '../kit/Charts';
+import { CompactHeader, ReportHeader } from '../kit/Header';
+import { ReportFooter } from '../kit/Footer';
+import { KitTable, paginateRows } from '../kit/Table';
+import { PAGE, PDF_SUBJECT_ORDER, PDF_SUBJECT_SHORT, kitStyles } from '../kit/theme';
+import { puanColumn, subjectNetColumns, summaryTone, totalDynColumns } from '../kit/columns';
 
-function subjectChartData(schoolAverages) {
-  return (schoolAverages?.subjects ?? []).map((subject) => ({
-    label: LGS_SUBJECT_PDF_SHORT_LABELS[subject.code] ?? subject.label ?? subject.code,
-    net: subject.net ?? 0,
-  }));
+const FIRST_PAGE_ROWS = 11;
+const NEXT_PAGE_ROWS = 26;
+
+function subjectOf(subjects, code) {
+  return subjects?.find((subject) => subject.code === code) ?? null;
 }
 
 /** @param {{ model: import('../../reportSchemas').ClassAveragePdfModel }} props */
 export function ClassAveragePdf({ model }) {
   const { header, schoolAverages, classRows } = model;
   const generatedAt = formatReportDateTime(new Date());
+  const title = 'Şube Ortalama Listesi';
+  const subtitle = [header.sessionTitle, header.sessionDate, header.scopeLabel].filter(Boolean).join('  ·  ');
+  const width = PAGE.landscape.content;
+  const participantTotal = classRows.reduce((sum, row) => sum + (row.participantCount ?? 0), 0);
 
-  const summaryRow = buildAverageSummaryRow(schoolAverages, 'PUAN');
-  const summaryColumns = [
-    { key: 'label', label: '', width: '8%', render: (r) => r.label },
-    ...buildSubjectDYNColumns(false),
-    ...buildRankingColumns(),
-  ];
-
-  const dataColumns = [
-    { key: 'rank', label: 'SIRA NO', width: '5%', align: 'center', render: (r) => String(r.rank) },
-    { key: 'classLabel', label: 'ŞUBE', width: '7%', render: (r) => r.classLabel },
+  const columns = [
+    { key: 'rank', label: 'SIRA', w: 2.6, render: (row) => (row.__avg ? '' : row.rank) },
     {
-      key: 'studentCount',
-      label: 'Öğr S.',
-      width: '5%',
-      align: 'center',
-      render: (r) => String(r.studentCount),
+      key: 'class',
+      label: 'ŞUBE',
+      w: 4.6,
+      align: 'left',
+      tone: () => ({ bold: true }),
+      render: (row) => row.classLabel,
     },
-    ...buildSubjectDYNColumns(false),
-    ...buildRankingColumns(),
+    {
+      key: 'count',
+      label: 'KATILAN',
+      w: 3.6,
+      render: (row) =>
+        row.__avg
+          ? String(row.participantCount ?? '')
+          : row.studentCount && row.studentCount !== row.participantCount
+            ? `${row.participantCount} / ${row.studentCount}`
+            : String(row.participantCount ?? ''),
+    },
+    ...subjectNetColumns({ group: 'DERS NET ORTALAMALARI', w: 4.2 }),
+    ...totalDynColumns({ group: 'TOPLAM ORTALAMA' }),
+    puanColumn({ label: 'ORT. PUAN' }),
   ];
 
-  const subjectHeader = buildSubjectHeaderRows(false);
-  const rankingHeader = buildRankingHeaderRows();
-  const headerRows = [
-    [
-      { label: 'SIRA NO', width: '5%' },
-      { label: 'ŞUBE', width: '7%' },
-      { label: 'Öğr S.', width: '5%' },
-      ...subjectHeader[0],
-      ...rankingHeader[0],
-    ],
-    [
-      { label: '', width: '5%' },
-      { label: '', width: '7%' },
-      { label: '', width: '5%' },
-      ...subjectHeader[1],
-      ...rankingHeader[1],
-    ],
-    [
-      { label: '', width: '5%' },
-      { label: '', width: '7%' },
-      { label: '', width: '5%' },
-      ...subjectHeader[1],
-      ...rankingHeader[2],
-    ],
-  ];
+  const toRow = (row, extra = {}) => ({ ...row, __decimal: true, ...extra });
+  const averageRow = toRow(
+    { ...schoolAverages, id: 'avg', classLabel: 'ORTALAMA', participantCount: schoolAverages.participantCount },
+    { __avg: true }
+  );
 
-  const summaryHeaderRows = [
-    [{ label: 'ORTALAMA NETLER', width: '100%', colSpan: 20 }],
-    [
-      { label: 'PUAN', width: '8%' },
-      ...LGS_SUBJECTS.flatMap((def) => [
-        { label: LGS_SUBJECT_PDF_SHORT_LABELS[def.code] ?? def.shortLabel, width: '9%', colSpan: 3 },
-      ]),
-      { label: 'TOPLAM', width: '9%', colSpan: 3 },
-      { label: 'LGS', width: '4%' },
-    ],
-    [
-      { label: '', width: '8%' },
-      ...LGS_SUBJECTS.flatMap(() => [
-        { label: 'D', width: '3%' },
-        { label: 'Y', width: '3%' },
-        { label: 'N', width: '3%' },
-      ]),
-      { label: 'D', width: '3%' },
-      { label: 'Y', width: '3%' },
-      { label: 'N', width: '3%' },
-      { label: '', width: '4%' },
-    ],
-  ];
+  const pages = paginateRows(classRows.map((row) => toRow(row)), FIRST_PAGE_ROWS, NEXT_PAGE_ROWS);
 
-  const rowChunks = chunkRows(classRows, 12);
-  const answerSegments = [
-    { label: 'Doğru', value: schoolAverages?.totalCorrect ?? 0, color: CHART_COLORS.correct },
-    { label: 'Yanlış', value: schoolAverages?.totalWrong ?? 0, color: CHART_COLORS.wrong },
-    { label: 'Boş', value: schoolAverages?.totalBlank ?? 0, color: CHART_COLORS.blank },
-  ];
+  const subjectBars = PDF_SUBJECT_ORDER.map((code) => {
+    const def = LGS_SUBJECTS.find((item) => item.code === code);
+    const net = subjectOf(schoolAverages.subjects, code)?.net ?? 0;
+    return {
+      label: PDF_SUBJECT_SHORT[code],
+      value: def?.questions ? (net / def.questions) * 100 : 0,
+      display: `${formatNum(net, 1)} / ${def?.questions ?? ''}`,
+    };
+  });
+
+  const classBars = classRows.slice(0, 8).map((row) => ({
+    label: row.classLabel,
+    value: row.lgsScore ?? 0,
+    display: formatNum(row.lgsScore, 0),
+  }));
 
   return (
-    <Document>
-      <Page size="A4" orientation="landscape" style={baseStyles.pageLandscape}>
-        <ReportHeader
-          schoolName={header.schoolName}
-          reportTitle={header.reportTitle}
-          subtitle={`${header.sessionTitle ?? ''} · ${header.sessionDate ?? ''}`}
-          meta={[
-            { label: 'Şube', value: String(classRows.length) },
-            { label: 'Ort. net', value: formatNum(schoolAverages?.totalNet, 2) },
-          ]}
-        />
-
-        <View style={chartStyles.chartsRow}>
-          <SubjectNetChart subjects={subjectChartData(schoolAverages)} title="Kurum ders ortalamaları" />
-          <DonutChart title="Kurum cevap dağılımı" segments={answerSegments} />
-        </View>
-
-        <PdfTable columns={summaryColumns} rows={[summaryRow]} headerRows={summaryHeaderRows} />
-        <PdfTable columns={dataColumns} rows={rowChunks[0]} headerRows={headerRows} />
-        <PdfFooter schoolName={header.schoolName} generatedAt={generatedAt} />
-      </Page>
-      {rowChunks.slice(1).map((chunk, pageIndex) => (
-        <Page key={`page-${pageIndex}`} size="A4" orientation="landscape" style={baseStyles.pageLandscape}>
-          <PdfTable columns={dataColumns} rows={chunk} headerRows={headerRows} />
-          <PdfFooter schoolName={header.schoolName} generatedAt={generatedAt} />
+    <Document title={`${title} — ${header.sessionTitle ?? ''}`} author={header.schoolName}>
+      {pages.map((chunk, pageIndex) => (
+        <Page key={`p-${pageIndex}`} size="A4" orientation="landscape" style={kitStyles.pageLandscape}>
+          {pageIndex === 0 ? (
+            <>
+              <ReportHeader
+                schoolName={header.schoolName}
+                title={title}
+                subtitle={subtitle}
+                meta={[
+                  { label: 'Şube', value: String(classRows.length) },
+                  { label: 'Katılımcı', value: String(participantTotal) },
+                  { label: 'Ort. net', value: formatNum(schoolAverages.totalNet, 2) },
+                  { label: 'Ort. puan', value: formatNum(schoolAverages.lgsScore, 2) },
+                ]}
+              />
+              <View style={kitStyles.cardRow}>
+                <BarListCard title="Ders başarısı (net / soru sayısı)" items={subjectBars} max={100} flex={1.15} />
+                <BarListCard title="Şube ortalama puanı" items={classBars} max={500} flex={1} />
+                <DonutCard
+                  title="Ortalama cevap dağılımı"
+                  centerLabel="soru"
+                  digits={1}
+                  flex={1}
+                  segments={[
+                    { label: 'Doğru', value: schoolAverages.totalCorrect ?? 0, color: CHART.correct },
+                    { label: 'Yanlış', value: schoolAverages.totalWrong ?? 0, color: CHART.wrong },
+                    { label: 'Boş', value: schoolAverages.totalBlank ?? 0, color: CHART.blank },
+                  ]}
+                />
+              </View>
+            </>
+          ) : (
+            <CompactHeader title={title} subtitle={subtitle} />
+          )}
+          <KitTable
+            columns={columns}
+            rows={pageIndex === 0 ? [averageRow, ...chunk] : chunk}
+            width={width}
+            rowHeight={18}
+            rowTone={summaryTone}
+          />
+          <ReportFooter schoolName={header.schoolName} label={title} generatedAt={generatedAt} />
         </Page>
       ))}
     </Document>

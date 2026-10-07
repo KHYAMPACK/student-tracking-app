@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { loadExamSessions } from '../../lib/exams';
 import {
   loadRankingsForSessions,
@@ -12,6 +12,7 @@ import {
 } from '../../lib/examAnalysis';
 import { buildClassAverageReport } from '../../lib/examReports/buildClassAverageReport';
 import { buildClassCombinedReport } from '../../lib/examReports/buildClassCombinedReport';
+import { buildExamResultsReport, resolveScopeLabel } from '../../lib/examReports/buildExamResultsReport';
 import { buildMultiExamAverageReport } from '../../lib/examReports/buildMultiExamAverageReport';
 import { buildQuestionFrequencyReportData } from '../../lib/examReports/buildQuestionFrequencyReport';
 import { buildStudentAllExamsReport } from '../../lib/examReports/buildStudentAllExamsReport';
@@ -21,29 +22,34 @@ import ExamReportExport from './reports/ExamReportExport';
 
 const MOCK_REPORTS = [
   {
-    id: 'class_combined',
-    label: 'Birleştirilmiş karne',
-    blurb: 'Çoklu deneme + konu analizi şablonu',
+    id: 'exam_results',
+    label: 'Deneme sonuç listesi',
+    blurb: 'Tek deneme, öğrenci bazlı net, puan ve sıralama',
+  },
+  {
+    id: 'class_average',
+    label: 'Şube ortalama listesi',
+    blurb: 'Tek deneme, şube bazlı ortalamalar',
   },
   {
     id: 'question_frequency',
     label: 'Soru frekans',
-    blurb: 'Soru bazlı doğru/yanlış dağılımı şablonu',
+    blurb: 'Soru bazlı doğru/yanlış dağılımı',
   },
   {
     id: 'student_all_exams',
     label: 'Öğrenci gelişim',
-    blurb: 'Tek öğrencinin tüm sınavları şablonu',
-  },
-  {
-    id: 'class_average',
-    label: 'Sınıf ortalaması',
-    blurb: 'Tek sınav sıralama tablosu şablonu',
+    blurb: 'Tek öğrencinin tüm sınavları',
   },
   {
     id: 'multi_exam_average',
-    label: 'Çoklu ortalama',
-    blurb: 'Birden fazla sınav ortalama tablosu şablonu',
+    label: 'Çoklu deneme ortalaması',
+    blurb: 'Birden fazla deneme, öğrenci ortalamaları',
+  },
+  {
+    id: 'class_combined',
+    label: 'Birleştirilmiş karne',
+    blurb: 'Çoklu deneme + konu analizi',
   },
 ];
 
@@ -133,6 +139,8 @@ export default function ExamReportsPanel({
   const multiSelected = sessions.filter((s) => reportSessionIds.includes(s.id));
   const hasSessionResults = subjectResults.length > 0 || rankings.length > 0;
   const hasAnswerKey = Boolean(selectedSession?.answer_key_id);
+  const scopeLabel = useMemo(() => resolveScopeLabel(students, classes), [students, classes]);
+  const multiWithKey = multiSelected.filter((session) => session.answer_key_id);
 
   function toggleReportSession(sessionId) {
     setReportSessionIds((current) =>
@@ -141,30 +149,38 @@ export default function ExamReportsPanel({
   }
 
   function exportClassCombined() {
-    if (!selectedSession?.answer_key_id) {
-      setError(new Error('Birleştirilmiş karne için cevap anahtarı gerekir.'));
-      return;
-    }
     if (!multiSelected.length) {
       setError(new Error('En az bir deneme seçin.'));
+      return;
+    }
+    if (!multiWithKey.length) {
+      setError(new Error('Birleştirilmiş karne için seçilen denemelerden en az birinde cevap anahtarı gerekir.'));
       return;
     }
     (async () => {
       try {
         setError(null);
         const ids = multiSelected.map((s) => s.id);
-        const [allSubjects, questions, answerGroups] = await Promise.all([
+        // Every exam has its own answer key, so topics are read from each exam's own questions.
+        const keyIds = [...new Set(multiWithKey.map((session) => session.answer_key_id))];
+        const [allSubjects, allRankings, questionSets, answerSets] = await Promise.all([
           loadSubjectResultsForSessions(ids),
-          loadQuestionsForAnswerKey(selectedSession.answer_key_id),
-          Promise.all(ids.map((id) => loadSessionStudentAnswers(id))),
+          loadRankingsForSessions(ids),
+          Promise.all(keyIds.map((keyId) => loadQuestionsForAnswerKey(keyId))),
+          Promise.all(multiWithKey.map((session) => loadSessionStudentAnswers(session.id))),
         ]);
+        const questionsByKey = new Map(keyIds.map((keyId, index) => [keyId, questionSets[index]]));
         setActiveReport(
           buildClassCombinedReport({
             sessions: multiSelected,
             subjectResults: allSubjects,
-            questions,
-            answers: answerGroups.flat(),
-            classLabel: 'Tüm kurum',
+            rankings: allRankings,
+            topicSources: multiWithKey.map((session, index) => ({
+              questions: questionsByKey.get(session.answer_key_id) ?? [],
+              answers: answerSets[index],
+            })),
+            studentIds: students.map((s) => s.id),
+            scopeLabel,
             schoolName: school?.name,
           })
         );
@@ -192,7 +208,7 @@ export default function ExamReportsPanel({
             questions,
             answers,
             classStudentIds: students.map((s) => s.id),
-            classLabel: 'Tüm kurum',
+            classLabel: scopeLabel,
             schoolName: school?.name,
           })
         );
@@ -200,6 +216,22 @@ export default function ExamReportsPanel({
         setError(reportError);
       }
     })();
+  }
+
+  function exportExamResults() {
+    if (!selectedSession) return;
+    setError(null);
+    setActiveReport(
+      buildExamResultsReport({
+        session: selectedSession,
+        subjectResults,
+        rankings,
+        students,
+        classes,
+        schoolName: school?.name,
+        scopeLabel,
+      })
+    );
   }
 
   function exportClassAverage() {
@@ -213,6 +245,7 @@ export default function ExamReportsPanel({
         classes,
         rankings,
         schoolName: school?.name,
+        scopeLabel,
       })
     );
   }
@@ -232,8 +265,10 @@ export default function ExamReportsPanel({
             sessions: multiSelected,
             subjectResults: allSubjects,
             students,
+            classes,
             rankings: allRankings,
             schoolName: school?.name,
+            scopeLabel,
           })
         );
       } catch (reportError) {
@@ -342,9 +377,21 @@ export default function ExamReportsPanel({
 
             <div className="exam-report-type-grid">
               <ReportTypeCard
-                title="Sınıf ortalama tablosu"
+                title="Deneme sonuç listesi"
+                audience="Müdür · Rehberlik · Öğretmen"
+                description="Seçilen denemede her öğrencinin ders bazlı doğru/yanlış/net değerlerini, puanını ve sıralamasını puana göre sıralı tek listede verir."
+                requirement={
+                  hasSessionResults
+                    ? `${formatSessionLabel(selectedSession)} için sonuç mevcut`
+                    : 'Bu denemeye en az bir öğrenci sonucu girilmeli'
+                }
+                ready={Boolean(selectedSession && hasSessionResults)}
+                onAction={exportExamResults}
+              />
+              <ReportTypeCard
+                title="Şube ortalama listesi"
                 audience="Rehberlik · Müdür"
-                description="Seçilen denemede tüm öğrencilerin net, puan ve sıralamasını tek tabloda gösterir. Şube/kurum karşılaştırması için kullanın."
+                description="Seçilen denemede şubelerin ders net ortalamalarını ve ortalama puanlarını karşılaştırır."
                 requirement={
                   hasSessionResults
                     ? `${formatSessionLabel(selectedSession)} için sonuç mevcut`
@@ -461,15 +508,17 @@ export default function ExamReportsPanel({
               <ReportTypeCard
                 title="Birleştirilmiş sınıf karnesi"
                 audience="Rehberlik · Sınıf öğretmeni"
-                description="Seçilen denemeleri tek PDF'te birleştirir; konu bazlı başarı ve deneme listesi içerir."
+                description="Seçilen denemeleri tek PDF'te birleştirir; her denemenin kendi cevap anahtarından konu bazlı başarıyı toplar."
                 requirement={
-                  reportSessionIds.length && hasAnswerKey
-                    ? `${reportSessionIds.length} deneme + cevap anahtarı`
-                    : reportSessionIds.length
-                      ? 'Referans denemeye cevap anahtarı ekleyin (üst bölümdeki seçim)'
-                      : 'En az bir deneme işaretleyin'
+                  !reportSessionIds.length
+                    ? 'En az bir deneme işaretleyin'
+                    : multiWithKey.length === 0
+                      ? 'Seçilen denemelerin hiçbirinde cevap anahtarı yok'
+                      : multiWithKey.length < reportSessionIds.length
+                        ? `${reportSessionIds.length} deneme · konu analizi ${multiWithKey.length} denemenin cevap anahtarıyla`
+                        : `${reportSessionIds.length} deneme · hepsinde cevap anahtarı var`
                 }
-                ready={reportSessionIds.length > 0 && hasAnswerKey}
+                ready={multiWithKey.length > 0}
                 onAction={exportClassCombined}
               />
               <ReportTypeCard

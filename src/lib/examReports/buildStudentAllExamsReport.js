@@ -50,15 +50,26 @@ export function buildStudentAllExamsReport({
       };
     });
 
+  const mean = (values) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
+  const round = (value, digits) => (value == null ? null : Math.round(value * 10 ** digits) / 10 ** digits);
   const averages = {
     subjects: LGS_SUBJECTS.map((def) => {
-      const nets = exams.map((e) => e.subjects.find((s) => s.code === def.code)?.net).filter((n) => n != null);
-      const avg = nets.length ? nets.reduce((a, b) => a + b, 0) / nets.length : null;
-      return { ...def, net: avg != null ? Math.round(avg * 100) / 100 : null };
+      const entries = exams
+        .map((exam) => exam.subjects.find((subject) => subject.code === def.code))
+        .filter((entry) => entry?.net != null);
+      const avg = (field) => round(mean(entries.map((entry) => Number(entry[field]) || 0)), field === 'net' ? 2 : 1);
+      return {
+        ...def,
+        net: entries.length ? avg('net') : null,
+        correct: entries.length ? avg('correct') : null,
+        wrong: entries.length ? avg('wrong') : null,
+        blank: entries.length ? avg('blank') : null,
+      };
     }),
-    totalNet: exams.length
-      ? Math.round((exams.reduce((s, e) => s + e.totalNet, 0) / exams.length) * 100) / 100
-      : null,
+    totalCorrect: round(mean(exams.map((exam) => exam.totalCorrect ?? 0)), 1),
+    totalWrong: round(mean(exams.map((exam) => exam.totalWrong ?? 0)), 1),
+    totalBlank: round(mean(exams.map((exam) => exam.totalBlank ?? 0)), 1),
+    totalNet: exams.length ? round(mean(exams.map((exam) => exam.totalNet ?? 0)), 2) : null,
     lgsScore: null,
   };
   // Her denemenin puanı kendi katsayılarıyla hesaplanmıştır; ortalama puan bunların ortalamasıdır.

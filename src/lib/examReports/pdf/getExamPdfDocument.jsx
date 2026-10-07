@@ -2,6 +2,7 @@ import { toExamPdfModel } from './adapters';
 import { registerPdfFonts } from './registerFonts';
 import { ClassCombinedPdf } from './documents/ClassCombinedPdf';
 import { ClassAveragePdf } from './documents/ClassAveragePdf';
+import { ExamResultsPdf } from './documents/ExamResultsPdf';
 import { MultiExamAveragePdf } from './documents/MultiExamAveragePdf';
 import { QuestionFrequencyPdf } from './documents/QuestionFrequencyPdf';
 import { StudentAllExamsPdf } from './documents/StudentAllExamsPdf';
@@ -12,6 +13,8 @@ export function getExamPdfDocument(reportOrModel) {
   const model = reportOrModel?.header ? reportOrModel : toExamPdfModel(reportOrModel);
 
   switch (model.type) {
+    case 'exam_results':
+      return <ExamResultsPdf model={model} />;
     case 'class_combined':
       return <ClassCombinedPdf model={model} />;
     case 'question_frequency':

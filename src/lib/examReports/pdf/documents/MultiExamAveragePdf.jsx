@@ -1,190 +1,153 @@
-import { Document, Page, Text, View } from '@react-pdf/renderer';
-import { chunkRows, formatNum, formatReportDateTime } from '../formatReport';
-import { CHART_COLORS, DonutChart, SubjectNetChart } from '../PdfCharts';
-import { PdfFooter, PdfTable } from '../PdfTable';
-import { ReportHeader } from '../ReportHeader';
-import {
-  buildAverageSummaryRow,
-  buildRankingColumns,
-  buildRankingHeaderRows,
-  buildSubjectDYNColumns,
-  buildSubjectHeaderRows,
-  LGS_SUBJECT_PDF_SHORT_LABELS,
-} from '../SubjectGridHeader';
-import { baseStyles, chartStyles } from '../styles';
+import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
+import { LGS_SUBJECTS } from '../../../lgsExam';
+import { formatNum, formatReportDateTime } from '../formatReport';
+import { BarListCard, LineChartCard } from '../kit/Charts';
+import { CompactHeader, ReportHeader } from '../kit/Header';
+import { ReportFooter } from '../kit/Footer';
+import { KitTable, paginateRows } from '../kit/Table';
+import { PAGE, PDF_SUBJECT_ORDER, PDF_SUBJECT_SHORT, kitStyles, theme } from '../kit/theme';
+import { puanColumn, subjectNetColumns, summaryTone, totalDynColumns } from '../kit/columns';
 
-function SessionList({ sessions }) {
-  return (
-    <View style={baseStyles.examListRow}>
-      {sessions.map((session) => (
-        <View key={session.order} style={baseStyles.examListItem}>
-          <Text>
-            {session.order}. {session.title} · {session.heldOn}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-}
+const FIRST_PAGE_ROWS = 14;
+const NEXT_PAGE_ROWS = 27;
+const MAX_EXAM_COLUMNS = 6;
 
-function buildFullColumns() {
-  return [
-    { key: 'rank', label: 'SIRA NO', width: '4%', align: 'center', render: (r) => String(r.rank) },
-    { key: 'classLabel', label: 'ŞB', width: '5%', render: (r) => r.classLabel },
-    { key: 'studentName', label: 'ADI SOYADI', width: '12%', render: (r) => r.studentName },
-    ...buildSubjectDYNColumns(true),
-    ...buildRankingColumns(),
-  ];
-}
+const s = StyleSheet.create({
+  sessionLine: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  sessionChip: {
+    fontSize: 6.5,
+    color: theme.body,
+    marginRight: 12,
+    marginBottom: 2,
+  },
+  sessionNo: {
+    fontWeight: 700,
+    color: theme.accent,
+  },
+});
 
-function buildNetOnlyColumns() {
-  return [
-    { key: 'rank', label: 'SIRA NO', width: '5%', align: 'center', render: (r) => String(r.rank) },
-    { key: 'classLabel', label: 'ŞB', width: '6%', render: (r) => r.classLabel },
-    { key: 'studentName', label: 'ADI SOYADI', width: '16%', render: (r) => r.studentName },
-    ...buildSubjectDYNColumns(true),
-    { key: 'total_d', label: 'D', width: '3%', align: 'center', render: (r) => formatNum(r.totalCorrect, 0) },
-    { key: 'total_y', label: 'Y', width: '3%', align: 'center', render: (r) => formatNum(r.totalWrong, 0) },
-    { key: 'total_n', label: 'N', width: '4%', align: 'center', render: (r) => formatNum(r.totalNet, 2) },
-  ];
-}
-
-function buildFullHeaderRows() {
-  const subjectHeader = buildSubjectHeaderRows(true);
-  const rankingHeader = buildRankingHeaderRows();
-  return [
-    [
-      { label: 'SIRA NO', width: '4%' },
-      { label: 'ŞB', width: '5%' },
-      { label: 'ADI SOYADI', width: '12%' },
-      ...subjectHeader[0],
-      ...rankingHeader[0],
-    ],
-    [
-      { label: '', width: '4%' },
-      { label: '', width: '5%' },
-      { label: '', width: '12%' },
-      ...subjectHeader[1],
-      ...rankingHeader[1],
-    ],
-    [
-      { label: '', width: '4%' },
-      { label: '', width: '5%' },
-      { label: '', width: '12%' },
-      ...subjectHeader[1],
-      ...rankingHeader[2],
-    ],
-  ];
-}
-
-function buildNetOnlyHeaderRows() {
-  const subjectHeader = buildSubjectHeaderRows(true);
-  return [
-    [
-      { label: 'SIRA NO', width: '5%' },
-      { label: 'ŞB', width: '6%' },
-      { label: 'ADI SOYADI', width: '16%' },
-      ...subjectHeader[0],
-      { label: 'TOPLAM', width: '10%', colSpan: 3 },
-    ],
-    [
-      { label: '', width: '5%' },
-      { label: '', width: '6%' },
-      { label: '', width: '16%' },
-      ...subjectHeader[1],
-      { label: 'D', width: '3%' },
-      { label: 'Y', width: '3%' },
-      { label: 'N', width: '4%' },
-    ],
-  ];
-}
-
-function subjectChartData(schoolAverages) {
-  return (schoolAverages?.subjects ?? []).map((subject) => ({
-    label: LGS_SUBJECT_PDF_SHORT_LABELS[subject.code] ?? subject.label ?? subject.code,
-    net: subject.net ?? 0,
-  }));
+function subjectOf(subjects, code) {
+  return subjects?.find((subject) => subject.code === code) ?? null;
 }
 
 /** @param {{ model: import('../../reportSchemas').MultiExamAveragePdfModel }} props */
 export function MultiExamAveragePdf({ model }) {
   const { header, sessions, schoolAverages, rows } = model;
   const generatedAt = formatReportDateTime(new Date());
+  const title = 'Çoklu Deneme Ortalaması';
+  const subtitle = [`${sessions.length} denemenin ortalaması`, header.scopeLabel].filter(Boolean).join('  ·  ');
+  const width = PAGE.landscape.content;
+  const showExamScores = sessions.length > 0 && sessions.length <= MAX_EXAM_COLUMNS;
 
-  const summaryRow = buildAverageSummaryRow(schoolAverages, 'PUAN');
-  const summaryColumns = [
-    { key: 'label', label: '', width: '6%', render: (r) => r.label },
-    ...buildSubjectDYNColumns(false),
-    ...buildRankingColumns(),
+  const columns = [
+    { key: 'rank', label: 'SIRA', w: 2.6, render: (row) => (row.__avg ? '' : row.rank) },
+    { key: 'class', label: 'ŞUBE', w: 3.2, render: (row) => row.classLabel },
+    {
+      key: 'name',
+      label: 'ADI SOYADI',
+      w: 12,
+      align: 'left',
+      tone: () => ({ bold: true }),
+      render: (row) => row.studentName,
+    },
+    { key: 'count', label: 'DEN.', w: 2.2, render: (row) => (row.__avg ? '' : row.examCount) },
+    ...subjectNetColumns({ group: 'DERS NET ORTALAMALARI', w: 3.6 }),
+    ...totalDynColumns({ group: 'TOPLAM ORTALAMA' }),
+    puanColumn({ label: 'ORT. PUAN' }),
+    ...(showExamScores
+      ? sessions.map((session, index) => ({
+          key: `exam_${session.order}`,
+          label: `${session.order}`,
+          w: 3.6,
+          group: 'DENEME PUANLARI',
+          sep: index === 0,
+          render: (row) => (row.examScores?.[index] != null ? formatNum(row.examScores[index], 1) : '—'),
+        }))
+      : []),
   ];
 
-  const fullColumns = buildFullColumns();
-  const fullHeaderRows = buildFullHeaderRows();
-  const fullChunks = chunkRows(rows, 14);
+  const toRow = (row) => ({ ...row, __decimal: true });
+  const averageRow = {
+    ...schoolAverages,
+    id: 'avg',
+    __avg: true,
+    __decimal: true,
+    classLabel: '',
+    studentName: 'KURUM ORTALAMASI',
+    examScores: sessions.map((session) => session.avgScore ?? null),
+  };
 
-  const netColumns = buildNetOnlyColumns();
-  const netHeaderRows = buildNetOnlyHeaderRows();
-  const netChunks = chunkRows(rows, 16);
+  const pages = paginateRows(rows.map(toRow), FIRST_PAGE_ROWS, NEXT_PAGE_ROWS);
 
-  const answerSegments = [
-    { label: 'Doğru', value: schoolAverages?.totalCorrect ?? 0, color: CHART_COLORS.correct },
-    { label: 'Yanlış', value: schoolAverages?.totalWrong ?? 0, color: CHART_COLORS.wrong },
-    { label: 'Boş', value: schoolAverages?.totalBlank ?? 0, color: CHART_COLORS.blank },
-  ];
+  const subjectBars = PDF_SUBJECT_ORDER.map((code) => {
+    const def = LGS_SUBJECTS.find((item) => item.code === code);
+    const net = subjectOf(schoolAverages.subjects, code)?.net ?? 0;
+    return {
+      label: PDF_SUBJECT_SHORT[code],
+      value: def?.questions ? (net / def.questions) * 100 : 0,
+      display: `${formatNum(net, 1)} / ${def?.questions ?? ''}`,
+    };
+  });
+
+  const trendPoints = sessions.map((session) => ({
+    label: `${session.order}`,
+    value: session.avgScore ?? null,
+  }));
+  const trendWidth = Math.floor((width - 8) * 0.56) - 20;
 
   return (
-    <Document>
-      <Page size="A4" orientation="landscape" style={baseStyles.pageLandscape}>
-        <ReportHeader
-          schoolName={header.schoolName}
-          reportTitle={header.reportTitle ?? 'LGS puan ortalama listesi'}
-          subtitle={`${sessions.length} denemenin birleşik karşılaştırması`}
-          meta={[
-            { label: 'Öğrenci', value: String(rows.length) },
-            { label: 'Deneme', value: String(sessions.length) },
-            { label: 'Ort. net', value: formatNum(schoolAverages?.totalNet, 2) },
-          ]}
-        />
-
-        <Text style={baseStyles.sectionTitle}>Hesaplanan denemeler</Text>
-        <SessionList sessions={sessions} />
-
-        <View style={chartStyles.chartsRow}>
-          <SubjectNetChart subjects={subjectChartData(schoolAverages)} title="Ders bazlı ortalama net" />
-          <DonutChart title="Toplam cevap dağılımı" segments={answerSegments} />
-        </View>
-
-        <PdfTable
-          columns={summaryColumns}
-          rows={[summaryRow]}
-          headerRows={[[{ label: 'ORTALAMA NETLER', width: '100%', colSpan: 20 }]]}
-        />
-        <PdfTable columns={fullColumns} rows={fullChunks[0]} headerRows={fullHeaderRows} />
-        <PdfFooter schoolName={header.schoolName} generatedAt={generatedAt} />
-      </Page>
-
-      {fullChunks.slice(1).map((chunk, pageIndex) => (
-        <Page key={`full-${pageIndex}`} size="A4" orientation="landscape" style={baseStyles.pageLandscape}>
-          <PdfTable columns={fullColumns} rows={chunk} headerRows={fullHeaderRows} />
-          <PdfFooter schoolName={header.schoolName} generatedAt={generatedAt} />
-        </Page>
-      ))}
-
-      <Page size="A4" orientation="landscape" style={baseStyles.pageLandscape}>
-        <ReportHeader
-          schoolName={header.schoolName}
-          reportTitle="Net sıralı liste"
-          subtitle="Seçili denemelerin birleşik net sıralaması"
-        />
-        <SessionList sessions={sessions} />
-        <PdfTable columns={netColumns} rows={netChunks[0]} headerRows={netHeaderRows} />
-        <PdfFooter schoolName={header.schoolName} generatedAt={generatedAt} />
-      </Page>
-
-      {netChunks.slice(1).map((chunk, pageIndex) => (
-        <Page key={`net-${pageIndex}`} size="A4" orientation="landscape" style={baseStyles.pageLandscape}>
-          <PdfTable columns={netColumns} rows={chunk} headerRows={netHeaderRows} />
-          <PdfFooter schoolName={header.schoolName} generatedAt={generatedAt} />
+    <Document title={title} author={header.schoolName}>
+      {pages.map((chunk, pageIndex) => (
+        <Page key={`p-${pageIndex}`} size="A4" orientation="landscape" style={kitStyles.pageLandscape}>
+          {pageIndex === 0 ? (
+            <>
+              <ReportHeader
+                schoolName={header.schoolName}
+                title={title}
+                subtitle={subtitle}
+                meta={[
+                  { label: 'Öğrenci', value: String(rows.length) },
+                  { label: 'Deneme', value: String(sessions.length) },
+                  { label: 'Ort. net', value: formatNum(schoolAverages.totalNet, 2) },
+                  { label: 'Ort. puan', value: formatNum(schoolAverages.lgsScore, 2) },
+                ]}
+              />
+              <View style={kitStyles.cardRow}>
+                <LineChartCard
+                  title="Deneme ortalama puanı"
+                  points={trendPoints}
+                  width={trendWidth}
+                  height={88}
+                  flex={1.28}
+                  digits={0}
+                />
+                <BarListCard title="Ders başarısı (net / soru sayısı)" items={subjectBars} max={100} flex={1} />
+              </View>
+              <View style={s.sessionLine}>
+                {sessions.map((session) => (
+                  <Text key={session.order} style={s.sessionChip}>
+                    <Text style={s.sessionNo}>{session.order}  </Text>
+                    {session.title}
+                    {session.heldOn ? `  ${session.heldOn}` : ''}
+                  </Text>
+                ))}
+              </View>
+            </>
+          ) : (
+            <CompactHeader title={title} subtitle={subtitle} />
+          )}
+          <KitTable
+            columns={columns}
+            rows={pageIndex === 0 ? [averageRow, ...chunk] : chunk}
+            width={width}
+            rowHeight={17}
+            rowTone={summaryTone}
+          />
+          <ReportFooter schoolName={header.schoolName} label={title} generatedAt={generatedAt} />
         </Page>
       ))}
     </Document>

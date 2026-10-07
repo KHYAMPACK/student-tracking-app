@@ -11,6 +11,37 @@ import { normalizeProfileRoles } from './profileRoles';
  */
 export const STAFF_CHANGELOG = [
   {
+    id: '2026-10-07-raporlar',
+    title: 'Deneme raporları yenilendi, sonuç listesi eklendi',
+    publishedOn: '2026-10-07',
+    intro:
+      'Tüm deneme PDF raporları baştan tasarlandı: daha okunaklı, doğru hizalanmış tablolar ve yeni bir deneme sonuç listesi.',
+    items: [
+      {
+        title: 'Yeni: Deneme sonuç listesi',
+        summary:
+          'Raporlar → Tek deneme bölümünden alınır. Seçilen denemede her öğrencinin ders bazlı doğru/yanlış/net değerleri, puanı ve sıralaması puana göre sıralı tek listede gelir; en üstte kurum ortalaması yer alır. Yayınevinin gönderdiği sonuç listesinin aynı düzenidir.',
+        steps: [
+          'Raporlar → «Hangi deneme?» listesinden denemeyi seçin.',
+          '«Deneme sonuç listesi» kartında «PDF oluştur»a basın.',
+        ],
+        roles: ['director', 'counselor', 'teacher'],
+      },
+      {
+        title: 'Yenilenen PDF görünümü',
+        summary:
+          'Şube ortalama listesi, çoklu deneme ortalaması, öğrenci gelişim raporu, birleştirilmiş karne ve soru frekans analizi daha büyük yazı, net tablo başlıkları, puan gelişim grafiği ve sayfa numaralarıyla yenilendi. Eski raporlarda başlıklardaki harflerin kesilmesi ve boş «Genel / LGS21 / LGS20 / LGS22» sütunları kaldırıldı. Soru analizinde doğru şık yeşil, en çok işaretlenen yanlış şık kırmızı gösterilir.',
+        roles: ['director', 'counselor', 'teacher'],
+      },
+      {
+        title: 'Düzeltmeler',
+        summary:
+          'Şube ortalama ve çoklu deneme raporlarında toplam doğru/yanlış/boş değerleri artık hesaplanıyor (daha önce boş görünüyordu). Birleştirilmiş karnede konu başarısı artık seçilen her denemenin kendi cevap anahtarından toplanıyor; daha önce yalnızca tek bir denemenin anahtarı kullanılıyordu. Raporlarda «Tüm kurum» yazısı yalnızca tüm kurum için çıkar, tek şubeyi görüyorsanız şube adı yazar. Çoklu deneme raporunda her denemenin puanı da ayrı sütunda görünür.',
+        roles: ['director', 'counselor', 'teacher'],
+      },
+    ],
+  },
+  {
     id: '2026-10-07-puan-hesabi',
     title: 'Deneme puanı yayınevi puanıyla aynı hesaplanıyor',
     publishedOn: '2026-10-07',

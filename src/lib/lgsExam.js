@@ -366,7 +366,7 @@ export function aggregateClassSubjectAverages(subjectRows, students, coefficient
   for (const student of students) {
     const classId = student.class_id ?? 'none';
     if (!byClass.has(classId)) {
-      byClass.set(classId, { classId, studentIds: new Set(), subjects: {} });
+      byClass.set(classId, { classId, studentIds: new Set(), participantIds: new Set(), subjects: {} });
     }
     byClass.get(classId).studentIds.add(student.id);
   }
@@ -377,9 +377,11 @@ export function aggregateClassSubjectAverages(subjectRows, students, coefficient
     const bucket = byClass.get(classId) ?? {
       classId,
       studentIds: new Set(),
+      participantIds: new Set(),
       subjects: {},
     };
     if (!byClass.has(classId)) byClass.set(classId, bucket);
+    bucket.participantIds.add(row.student_id);
 
     if (!bucket.subjects[row.subject_code]) {
       bucket.subjects[row.subject_code] = { nets: [], correct: 0, wrong: 0, blank: 0, count: 0 };
@@ -406,10 +408,19 @@ export function aggregateClassSubjectAverages(subjectRows, students, coefficient
       };
     });
     const totalNet = subjectAvgs.reduce((sum, s) => sum + (s.net ?? 0), 0);
+    // Whole-test averages: sum of each subject's (unrounded) per-student average.
+    const averageTotal = (field) =>
+      Math.round(
+        Object.values(bucket.subjects).reduce((sum, sub) => sum + (sub.count ? sub[field] / sub.count : 0), 0) * 10
+      ) / 10;
     return {
       classId: bucket.classId,
       studentCount: bucket.studentIds.size,
+      participantCount: bucket.participantIds.size,
       subjects: subjectAvgs,
+      totalCorrect: averageTotal('correct'),
+      totalWrong: averageTotal('wrong'),
+      totalBlank: averageTotal('blank'),
       totalNet: Math.round(totalNet * 100) / 100,
       // Puan ders netlerinde doğrusal olduğundan ortalama netlerden hesaplanan puan = ortalama puan.
       lgsScore: computeLgsScore(subjectAvgs, coefficients) ?? estimateLgsScore(totalNet),
