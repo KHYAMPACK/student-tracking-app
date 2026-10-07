@@ -144,7 +144,7 @@ export default function ParentExamReport({ student, klass, subjectResults, ranki
               <table className="exam-mini-table">
                 <thead>
                   <tr>
-                    <th>Ders</th>
+                    <th className="exam-mini-table__name">Ders</th>
                     <th>D</th>
                     <th>Y</th>
                     <th>B</th>
@@ -156,7 +156,7 @@ export default function ParentExamReport({ student, klass, subjectResults, ranki
                     const row = card.subjects.find((s) => s.code === def.code);
                     return (
                       <tr key={def.code}>
-                        <td>{def.label}</td>
+                        <td className="exam-mini-table__name">{def.label}</td>
                         <td>{row?.correct ?? '—'}</td>
                         <td>{row?.wrong ?? '—'}</td>
                         <td>{row?.blank ?? '—'}</td>

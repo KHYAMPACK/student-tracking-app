@@ -9072,6 +9072,36 @@ body {
 .exam-mini-table td {
   border-bottom: 1px solid var(--theme-accent-border);
   padding: 0.35rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.exam-mini-table .exam-mini-table__name {
+  text-align: left;
+}
+
+.latest-exam {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.latest-exam__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.latest-exam__head > div:first-child {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.latest-exam__scores {
+  display: grid;
+  justify-items: end;
+  font-weight: 700;
+  font-size: 0.875rem;
 }
 
 .exam-progress-chart {

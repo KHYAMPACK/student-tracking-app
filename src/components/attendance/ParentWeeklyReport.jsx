@@ -25,6 +25,7 @@ import {
 } from '../../lib/parentDemoData';
 import { InlineError } from '../dashboardUi';
 import { Icon, IconWell } from '../ui/Icon';
+import LatestExamSummary from '../exams/LatestExamSummary';
 import AnimatedBarFill from './AnimatedBarFill';
 import ReportDonut, { reportDonutSegments } from './ReportDonut';
 import { useCountUp, useInView } from '../../lib/motion';
@@ -582,6 +583,7 @@ function AtlasWeeklyReportCard({ report }) {
   return (
     <article className="week-report__child week-report__child--atlas">
       <ReportHeroHeader report={report} />
+      <LatestExamSummary studentId={report.student.id} />
       <AtlasReportHero report={report} />
       <ReportAttendance presence={report.presence} />
       <AtlasSubjectGrid bySubject={report.bySubject} />
@@ -607,6 +609,7 @@ function StandardWeeklyReportCard({ report }) {
   return (
     <article className="week-report__child">
       <ReportHeroHeader report={report} />
+      <LatestExamSummary studentId={report.student.id} />
 
       <div className="week-report__stats">
         {stats.attendancePct != null ? (
