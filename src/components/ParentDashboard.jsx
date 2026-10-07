@@ -5,7 +5,7 @@ import { isPushSupported, subscribeToWebPush } from '../lib/pushNotifications';
 import { useAuth } from '../context/AuthContext';
 import { hasAtlasSchedule, hasAccounting, hasHomeworkTracking } from '../lib/schoolFeatures';
 import { usePresence } from '../lib/motion';
-import { AppNavbar, ErrorMessage, InlineError, SuccessMessage, getMessageCategory, LoadingPanel } from './dashboardUi';
+import { AppNavbar, ErrorMessage, SuccessMessage, getMessageCategory, LoadingPanel } from './dashboardUi';
 import { formatChildTrackingTr, formatRelativeTimeTr } from '../utils/formatTime';
 import { getParentTabs } from '../lib/demoData';
 import { DemoBottomNav, useDemoNav } from './demo/DemoKit';
@@ -29,6 +29,7 @@ import {
   useParentNotifications,
 } from './parent/ParentNotifications';
 import ParentTuitionStatus from './parent/ParentTuitionStatus';
+import PushPromptDialog from './parent/PushPromptDialog';
 import {
   CALENDAR_SELECT,
   addDaysIso,
@@ -68,6 +69,29 @@ function getInitialNotificationPermission() {
     return 'unsupported';
   }
   return Notification.permission;
+}
+
+const PUSH_PROMPT_SNOOZE_MS = 24 * 60 * 60 * 1000;
+
+function pushPromptSnoozeKey(userId) {
+  return `push-prompt-snoozed-until:${userId ?? 'anon'}`;
+}
+
+/** A parent who closed the prompt is left alone for a day instead of seeing it on every open. */
+function isPushPromptSnoozed(userId) {
+  try {
+    return Number(window.localStorage.getItem(pushPromptSnoozeKey(userId))) > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function snoozePushPrompt(userId) {
+  try {
+    window.localStorage.setItem(pushPromptSnoozeKey(userId), String(Date.now() + PUSH_PROMPT_SNOOZE_MS));
+  } catch {
+    // Storage can be blocked (private mode); the prompt then simply comes back next time.
+  }
 }
 
 const MESSAGE_SELECT = `
@@ -300,8 +324,16 @@ export default function ParentDashboard({ profile, schoolId, onSignOut }) {
     notificationPermission !== 'unsupported';
 
   useEffect(() => {
-    if (showNotificationPrompt) setPushPromptOpen(true);
-  }, [showNotificationPrompt]);
+    if (showNotificationPrompt && !isPushPromptSnoozed(profile?.id)) setPushPromptOpen(true);
+  }, [showNotificationPrompt, profile?.id]);
+
+  const dismissPushPrompt = useCallback(() => {
+    snoozePushPrompt(profile?.id);
+    setPushPromptOpen(false);
+    setPushError(null);
+  }, [profile?.id]);
+
+  const pushPromptVisible = showNotificationPrompt && pushPromptOpen;
 
   const weekIndex = Math.max(1, academicWeekIndex());
   const weekRangeLabel = formatWeekRangeTr(weekIndex);
@@ -665,27 +697,13 @@ export default function ParentDashboard({ profile, schoolId, onSignOut }) {
         onChange={demoNav.selectTab}
       />
 
-      {showNotificationPrompt && pushPromptOpen ? (
-        <div className="notify-prompt-overlay">
-          <div className="notify-prompt-modal" role="dialog" aria-labelledby="notify-prompt-title">
-            <IconWell name="bell" variant="lavender" />
-            <h2 id="notify-prompt-title" className="notify-prompt-modal__title">
-              Anlık bildirimler
-            </h2>
-            <p className="notify-prompt-text">
-              Okuldan gelen güncellemeleri telefonunuza anında almak için bildirimleri açın.
-            </p>
-            <button
-              type="button"
-              className="notify-prompt-btn"
-              onClick={handleEnableNotifications}
-              disabled={pushSubscribing}
-            >
-              {pushSubscribing ? 'Açılıyor…' : 'Anlık Bildirimleri Aç'}
-            </button>
-            {pushError ? <InlineError error={pushError} context="subscribe" /> : null}
-          </div>
-        </div>
+      {pushPromptVisible ? (
+        <PushPromptDialog
+          subscribing={pushSubscribing}
+          error={pushError}
+          onEnable={handleEnableNotifications}
+          onDismiss={dismissPushPrompt}
+        />
       ) : null}
     </>
   );
