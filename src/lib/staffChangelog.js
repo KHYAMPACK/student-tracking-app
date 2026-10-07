@@ -11,6 +11,20 @@ import { normalizeProfileRoles } from './profileRoles';
  */
 export const STAFF_CHANGELOG = [
   {
+    id: '2026-10-07-sekme-yenileme',
+    title: 'Sekme değiştirince uygulama artık yenilenmiyor',
+    publishedOn: '2026-10-07',
+    intro:
+      'Başka bir sekmeden uygulamaya geri döndüğünüzde sayfa kendiliğinden «Profiliniz yükleniyor…» ekranına düşüp açık olduğunuz yeri kaybediyordu; düzeltildi.',
+    items: [
+      {
+        title: 'Açık sayfa korunuyor',
+        summary:
+          'Sekmeler arasında gezerken, uygulamayı arka planda bırakıp döndüğünüzde veya oturum kendini yenilediğinde açık olduğunuz sekme, yazdığınız form ve kaydırma konumu olduğu gibi kalır. Profil yalnızca farklı bir kullanıcı giriş yaptığında yeniden yüklenir.',
+      },
+    ],
+  },
+  {
     id: '2026-10-07-raporlar',
     title: 'Deneme raporları yenilendi, sonuç listesi eklendi',
     publishedOn: '2026-10-07',

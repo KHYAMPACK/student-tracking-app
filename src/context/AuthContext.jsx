@@ -9,6 +9,11 @@ const SCHOOL_SELECT = 'id, name, logo_url, primary_color, secondary_color, custo
 
 const AuthContext = createContext(null);
 
+function isSameLogin(previous, next) {
+  if (!previous || !next) return previous === next;
+  return previous.user?.id === next.user?.id && previous.access_token === next.access_token;
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -29,7 +34,10 @@ export function AuthProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
+      // Supabase re-emits SIGNED_IN with a brand-new session object every time the browser tab
+      // becomes visible again. Keep the old object when nothing about the login changed, so
+      // coming back to the tab does not look like a new sign-in.
+      setSession((previous) => (isSameLogin(previous, nextSession) ? previous : nextSession));
       setAuthLoading(false);
     });
 
@@ -138,8 +146,14 @@ export function AuthProvider({ children }) {
     throw createError ?? new Error('Profil oluşturulamadı.');
   }, []);
 
+  // The profile only has to be (re)loaded when a different person logs in. Token refreshes and
+  // tab switches hand us a new session object for the same user; reloading the profile for those
+  // would flash the "Profiliniz yükleniyor…" screen and throw away whatever page the user was on.
+  const userId = session?.user?.id ?? null;
+  const user = useMemo(() => session?.user ?? null, [userId]);
+
   useEffect(() => {
-    if (!session?.user) {
+    if (!user) {
       setProfile(null);
       setSchool(null);
       setProfileError(null);
@@ -155,11 +169,7 @@ export function AuthProvider({ children }) {
       setProfileError(null);
 
       try {
-        const nextProfile = await fetchProfile(
-          session.user.id,
-          session.user.email,
-          session.user.user_metadata
-        );
+        const nextProfile = await fetchProfile(user.id, user.email, user.user_metadata);
 
         if (!mounted) return;
         setProfile(nextProfile);
@@ -186,7 +196,7 @@ export function AuthProvider({ children }) {
     return () => {
       mounted = false;
     };
-  }, [session, fetchProfile, fetchSchool]);
+  }, [user, fetchProfile, fetchSchool]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -203,19 +213,15 @@ export function AuthProvider({ children }) {
   }, [profile?.school_id, fetchSchool]);
 
   const refreshProfile = useCallback(async () => {
-    if (!session?.user) {
+    if (!user) {
       setProfile(null);
       return null;
     }
 
-    const nextProfile = await fetchProfile(
-      session.user.id,
-      session.user.email,
-      session.user.user_metadata
-    );
+    const nextProfile = await fetchProfile(user.id, user.email, user.user_metadata);
     setProfile(nextProfile);
     return nextProfile;
-  }, [session, fetchProfile]);
+  }, [user, fetchProfile]);
 
   const value = useMemo(
     () => ({
