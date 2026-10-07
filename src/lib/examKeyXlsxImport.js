@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { LGS_SUBJECTS } from './lgsExam';
 import { globalQuestionIndex } from './examAnalysis';
+import { lookupKazanimTopic } from './kazanimTopics';
 
 const CHOICE_PATTERN = /^[A-E]$/;
 
@@ -148,6 +149,9 @@ export function parseAnswerKeyXlsx(arrayBuffer) {
 
   const questions = [];
   const subjectsSeen = new Set();
+  const topicStats = { kod: 0, 'ust-kod': 0, dosya: 0, yok: 0 };
+  const parentCodes = new Map();
+  const unmatchedCodes = new Map();
   for (const block of best.blocks) {
     const subject = LGS_SUBJECTS.find((item) => item.code === block.subjectCode);
     if (!subject || subjectsSeen.has(subject.code)) continue;
@@ -177,11 +181,27 @@ export function parseAnswerKeyXlsx(arrayBuffer) {
         (block.cols.code != null ? String(row[block.cols.code] ?? '').trim() : '') ||
         kazanimCode(kazanimText);
       const fromCatalog = catalog.get(code.endsWith('.') ? code : `${code}.`) ?? catalog.get(code);
+      // The kazanım code is the primary source of the topic: exact code first, then its
+      // parent code. File labels (publisher konu, catalog sheet) only back it up.
+      const found = lookupKazanimTopic(code);
+      const fromCode = found && found.subject === subject.code ? found : null;
       const labels = [
+        fromCode?.konu ?? '',
         block.cols.konu != null ? String(row[block.cols.konu] ?? '').trim() : '',
         fromCatalog?.konu ?? '',
+        fromCode?.unit ?? '',
         fromCatalog?.unit ?? '',
       ].filter((label, index, all) => label && all.indexOf(label) === index);
+
+      const source = fromCode ? (fromCode.match === 'exact' ? 'kod' : 'ust-kod') : labels.length ? 'dosya' : 'yok';
+      topicStats[source] += 1;
+      if (source === 'ust-kod') {
+        const key = `${code}→${fromCode.code}`;
+        parentCodes.set(key, { code, parent: fromCode.code, konu: fromCode.konu, count: (parentCodes.get(key)?.count ?? 0) + 1 });
+      } else if (source !== 'kod') {
+        const key = code || `${subject.code}-${localNumber}`;
+        unmatchedCodes.set(key, { code, hasLabel: labels.length > 0, count: (unmatchedCodes.get(key)?.count ?? 0) + 1 });
+      }
 
       questions.push({
         question_index: globalQuestionIndex(subject.code, localNumber),
@@ -191,9 +211,23 @@ export function parseAnswerKeyXlsx(arrayBuffer) {
         correct_choice: CHOICE_PATTERN.test(choice) ? choice : '',
         topic_label: labels[0] ?? '',
         topic_alternates: labels.slice(1),
+        kazanim_code: code,
+        topic_source: source,
       });
     });
   }
+
+  for (const item of parentCodes.values()) {
+    warnings.push(
+      `Kod ${item.code} tabloda yok; üst kod ${item.parent} (${item.konu}) kullanıldı (${item.count} soru).`
+    );
+  }
+  for (const item of unmatchedCodes.values()) {
+    warnings.push(
+      `${item.code ? `Kod ${item.code} bulunamadı` : 'Kazanım kodu yok'} (${item.count} soru): ${item.hasLabel ? 'konu dosyadaki etiketten alındı' : 'konu sorulacak'}.`
+    );
+  }
+  meta.topicStats = topicStats;
 
   for (const subject of LGS_SUBJECTS) {
     if (!subjectsSeen.has(subject.code)) {

@@ -494,6 +494,14 @@ export default function ExamCsvImportWizard({
             {' · '}
             Konu etiketleri kayıttan önce müfredat ünitelerine bağlanır.
           </p>
+          {keyMeta?.topicStats ? (
+            <p className="dash-hint">
+              Konular: {keyMeta.topicStats.kod} soru kazanım koduyla
+              {keyMeta.topicStats['ust-kod'] ? `, ${keyMeta.topicStats['ust-kod']} soru üst koduyla` : ''}
+              {keyMeta.topicStats.dosya ? `, ${keyMeta.topicStats.dosya} soru dosyadaki etiketle` : ''}
+              {keyMeta.topicStats.yok ? `; ${keyMeta.topicStats.yok} soru için konu sorulacak` : ''}.
+            </p>
+          ) : null}
           {draftWarnings.length ? (
             <ul className="exam-import-wizard__warnings">
               {draftWarnings.slice(0, 8).map((warning) => (

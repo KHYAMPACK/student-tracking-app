@@ -11,6 +11,27 @@ import { normalizeProfileRoles } from './profileRoles';
  */
 export const STAFF_CHANGELOG = [
   {
+    id: '2026-10-07-konu-kodlari',
+    title: 'Deneme konuları kazanım kodundan otomatik belirlenir',
+    publishedOn: '2026-10-07',
+    intro:
+      '8. sınıf denemelerinde sorunun konusu artık kazanım kodundan (ör. T.8.3.5.1, F.8.1.1.1) bulunur; 8. sınıf ünitelerine konu listeleri eklendi.',
+    items: [
+      {
+        title: 'Kazanım koduyla konu seçimi',
+        summary:
+          'Cevap anahtarı Excel’inde her sorunun kazanım kodu okunur ve MEB kazanım tablosundan konusu bulunur. Kod tabloda yoksa üst kod kullanılır (ör. T.8.3.25.99 → T.8.3.25). İkisi de yoksa konu sorulur ve cevabınız kaydedilir; sonraki denemelerde aynı konu tekrar sorulmaz. Onay ekranında konuların kodla mı, üst kodla mı, dosyadaki etiketle mi belirlendiği yazar.',
+        roles: ['director', 'counselor'],
+      },
+      {
+        title: '8. sınıf ünitelerinde konu listeleri',
+        summary:
+          'Fen, Din ve İnkılap ünitelerinin altına MEB konuları eklendi (ör. Mevsimler ve İklim → Mevsimlerin Oluşumu, İklim ve Hava Hareketleri). Öğretmen müfredat ekranında ünitenin konuları görünür; konu eşleştirmede «Alt konu» seçilebilir. Matematik, Türkçe ve İngilizce ünitelerinde değişiklik yok. Türkçe’de müfredatta karşılığı olmayan birkaç konu (ör. Fiilimsi) ilk denemede bir kez sorulur.',
+        roles: ['director', 'counselor', 'teacher'],
+      },
+    ],
+  },
+  {
     id: '2026-10-07-optik-import',
     title: 'Denemeye Excel anahtarı ve optik .txt ile sonuç yükleme',
     publishedOn: '2026-10-07',

@@ -1,0 +1,188 @@
+[
+  {
+    "grade": 8,
+    "slug": "fen",
+    "units": [
+      {
+        "title": "Mevsimler ve İklim",
+        "sections": [
+          "Mevsimlerin Oluşumu",
+          "İklim ve Hava Hareketleri"
+        ]
+      },
+      {
+        "title": "DNA ve Genetik Kod",
+        "sections": [
+          "DNA ve Genetik Kod",
+          "Kalıtım",
+          "Mutasyon ve Modifikasyon",
+          "Adaptasyon (Çevreye Uyum)",
+          "Biyoteknoloji"
+        ]
+      },
+      {
+        "title": "Madde ve Endüstri",
+        "sections": [
+          "Periyodik Sistem",
+          "Fiziksel ve Kimyasal Değişimler",
+          "Kimyasal Tepkimeler",
+          "Asitler ve Bazlar",
+          "Maddenin Isı ile Etkileşimi",
+          "Türkiye'de Kimya Endüstrisi"
+        ]
+      },
+      {
+        "title": "Enerji Dönüşümleri ve Çevre Bilimi",
+        "sections": [
+          "Besin Zinciri ve Enerji Akışı",
+          "Enerji Dönüşümleri",
+          "Madde Döngüleri ve Çevre Sorunları",
+          "Sürdürülebilir Kalkınma"
+        ]
+      },
+      {
+        "title": "Elektrik Yükleri ve Elektrik Enerjisi",
+        "sections": [
+          "Elektrik Yükleri ve Elektriklenme",
+          "Elektrik Yüklü Cisimler",
+          "Elektrik Enerjisinin Dönüşümü"
+        ]
+      }
+    ]
+  },
+  {
+    "grade": 8,
+    "slug": "din",
+    "units": [
+      {
+        "title": "Ünite 1",
+        "sections": [
+          "Kader ve Kaza İnancı",
+          "İnsanın İradesi ve Kader",
+          "Kaderle İlgili Kavramlar",
+          "Bir Peygamber Tanıyorum: Hz. Musa (a.s.)",
+          "Bir Ayet Tanıyorum: Ayet el-Kürsi ve Anlamı"
+        ]
+      },
+      {
+        "title": "Ünite 2",
+        "sections": [
+          "İslam’ın Paylaşma ve Yardımlaşmaya Verdiği Önem",
+          "Zekât ve Sadaka İbadeti",
+          "Zekât ve Sadakanın Bireysel ve Toplumsal Faydaları",
+          "Bir Peygamber Tanıyorum: Hz. Şuayb (a.s.)",
+          "Bir Sure Tanıyorum: Maûn Suresi ve Anlamı"
+        ]
+      },
+      {
+        "title": "Ünite 3",
+        "sections": [
+          "Din, Birey ve Toplum",
+          "Dinin Temel Gayesi",
+          "Bir Peygamber Tanıyorum: Hz. Yusuf (a.s.)",
+          "Bir Sure Tanıyorum: Asr Suresi ve Anlamı"
+        ]
+      },
+      {
+        "title": "Ünite 4",
+        "sections": [
+          "Hz. Muhammed'in (s.a.v.) Doğruluğu ve Güvenilir Kişiliği",
+          "Hz. Muhammed'in (s.a.v.) Merhametli ve Affedici Oluşu",
+          "Hz. Muhammed'in (s.a.v.) İstişareye Önem Vermesi",
+          "Hz. Muhammed'in (s.a.v.) Davasındaki Cesaret ve Kararlılığı",
+          "Hz. Muhammed'in (s.a.v.) Hakkı Gözetmedeki Hassasiyeti",
+          "Hz. Muhammed'in (s.a.v.) İnsanlara Değer Vermesi",
+          "Bir Sure Tanıyorum: Kureyş Suresi ve Anlamı"
+        ]
+      },
+      {
+        "title": "Ünite 5",
+        "sections": [
+          "İslam Dininin Temel Kaynakları",
+          "Kur’an-ı Kerim’in Ana Konuları",
+          "Kur’an-ı Kerim’in Temel Özellikleri",
+          "Bir Peygamber Tanıyorum: Hz. Nuh (a.s.)"
+        ]
+      }
+    ]
+  },
+  {
+    "grade": 8,
+    "slug": "sosyal",
+    "units": [
+      {
+        "title": "Bir Kahraman Doğuyor",
+        "sections": [
+          "Uyanan Avrupa ve Sarsılan Osmanlı",
+          "Mavi Gözlü Çocuk: Mustafa",
+          "Buhranlar Büyük Kahramanlar Doğurur",
+          "Adım Adım Liderliğe"
+        ]
+      },
+      {
+        "title": "Milli Uyanış",
+        "sections": [
+          "I. Dünya Savaşı’na Yol Açan Gelişmeler",
+          "Osmanlı Devleti’nin Son Savaşı: I. Dünya Savaşı",
+          "İşgal Yıllarında Anadolu",
+          "Cemiyetler ve Kuvâ-yi Millîye",
+          "İstiklal Yolculuğu",
+          "Büyük Millet Meclisine Karşı Çıkarılan Ayaklanmalar",
+          "Geçersiz Bir Antlaşma: Sevr Antlaşması"
+        ]
+      },
+      {
+        "title": "Ya İstiklal Ya Ölüm",
+        "sections": [
+          "Doğu ve Güney Cepheleri",
+          "Batı Cephesi",
+          "Maarif Kongresi",
+          "Millî Mücadele, Millî Seferberlik: Tekalif-i Millîye",
+          "Direnişten Dirilişe: Sakarya'dan Büyük Taarruz’a",
+          "Türkiye'nin Tapu Senedi: Lozan Antlaşması",
+          "Sanat ve Edebiyat Eserlerinde Millî Mücadele"
+        ]
+      },
+      {
+        "title": "Atatürkçülük ve Çağdaşlaşan Türkiye",
+        "sections": [
+          "Atatürk İlkeleri",
+          "Siyasi Alandaki Gelişmeler",
+          "Hukuk Alanındaki Gelişmeler",
+          "Eğitim ve Kültür Alanındaki Gelişmeler",
+          "Toplumsal Alandaki Gelişmeler",
+          "Ekonomi Alanındaki Gelişmeler",
+          "Sağlık Alanındaki Gelişmeler",
+          "İlelebet Cumhuriyet",
+          "Atatürk İlke ve İnkılaplarının Temel Esasları"
+        ]
+      },
+      {
+        "title": "Demokratikleşme Çabaları",
+        "sections": [
+          "Demokratikleşme Yolunda Atılan Adımlar",
+          "Mustafa Kemal'e Suikast Girişimi",
+          "Türkiye Cumhuriyeti’ne Yönelik Tehditler"
+        ]
+      },
+      {
+        "title": "Atatürk Dönemi Dış Politika",
+        "sections": [
+          "Türk Dış Politikasının Temel İlkeleri",
+          "Dış Politikada Yaşanan Gelişmeler",
+          "Misak-ı Millî’nin Son Zaferi: Hatay"
+        ]
+      },
+      {
+        "title": "Atatürk'ün Ölümü ve Sonrası",
+        "sections": [
+          "Atatürk’ün Vefatı ve Yankıları",
+          "İnsan Eserleriyle Yaşar",
+          "Yeniden Sarsılan Dünya",
+          "II. Dünya Savaşı’nın Türkiye’ye Etkileri",
+          "Demokrasi Yolunda Güçlü Adımlar"
+        ]
+      }
+    ]
+  }
+]
