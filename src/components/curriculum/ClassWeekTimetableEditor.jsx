@@ -1,12 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatClassLabel, formatWeekRangeTr, loadCurriculumSubjects } from '../../lib/curriculum';
 import { formatCalendarDateTr } from '../../lib/calendar';
 import { ATLAS_SLOT_COUNT, loadAtlasSessionsForWeek } from '../../lib/atlasLessons';
 import {
+  CUSTOM_LABEL_MAX,
+  CUSTOM_LABEL_PRESETS,
   TIMETABLE_WEEKDAYS,
   copyTimetableFromPreviousWeek,
+  customCellLabel,
+  customCellValue,
   emptyTimetableGrid,
+  hasEmptyCustomCell,
+  isCustomCell,
   isoWeekday,
+  loadCustomTimetableLabels,
   loadTimetableForWeek,
   rowsToTimetableGrid,
   saveTimetableWeek,
@@ -14,6 +21,9 @@ import {
   timetableSubjectsForGrade,
 } from '../../lib/classWeekTimetable';
 import { InlineError, SendButton, SuccessMessage } from '../dashboardUi';
+
+const CUSTOM_OPTION = '__custom__';
+const CUSTOM_LABELS_LIST_ID = 'class-week-timetable-custom-labels';
 
 export default function ClassWeekTimetableEditor({
   schoolId,
@@ -27,6 +37,8 @@ export default function ClassWeekTimetableEditor({
   );
   const [grid, setGrid] = useState(() => emptyTimetableGrid());
   const [overridesByCell, setOverridesByCell] = useState({});
+  const [usedLabels, setUsedLabels] = useState([]);
+  const focusCellRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -41,6 +53,28 @@ export default function ClassWeekTimetableEditor({
   useEffect(() => {
     if (!classId && classes[0]?.id) setClassId(classes[0].id);
   }, [classes, classId]);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    let mounted = true;
+    loadCustomTimetableLabels(schoolId)
+      .then((labels) => {
+        if (mounted) setUsedLabels(labels);
+      })
+      .catch(() => {
+        // Suggestions are a convenience; the presets still work without them.
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [schoolId]);
+
+  const labelSuggestions = useMemo(() => {
+    const fromGrid = Object.values(grid).flatMap((day) =>
+      Object.values(day).filter(isCustomCell).map(customCellLabel)
+    );
+    return [...new Set([...CUSTOM_LABEL_PRESETS, ...usedLabels, ...fromGrid])].filter(Boolean);
+  }, [grid, usedLabels]);
 
   const load = useCallback(async () => {
     if (!schoolId || !classId || !weekIndex) return;
@@ -61,6 +95,7 @@ export default function ClassWeekTimetableEditor({
         if (!actualSubject) continue;
         const weekday = isoWeekday(session.session_date);
         const plannedSlug = plannedGrid[weekday]?.[session.slot_index] ?? '';
+        if (isCustomCell(plannedSlug)) continue;
         if (actualSubject.slug !== plannedSlug) {
           nextOverrides[`${weekday}-${session.slot_index}`] = {
             subjectName: actualSubject.name,
@@ -96,9 +131,13 @@ export default function ClassWeekTimetableEditor({
   async function handleSave(event) {
     event.preventDefault();
     if (!klass?.id) return;
-    setSaving(true);
     setError(null);
     setSuccess(null);
+    if (hasEmptyCustomCell(grid)) {
+      setError(new Error('«Özel…» seçtiğiniz hücrelere bir ad yazın veya hücreyi boş bırakın.'));
+      return;
+    }
+    setSaving(true);
     try {
       await saveTimetableWeek({
         schoolId,
@@ -106,6 +145,7 @@ export default function ClassWeekTimetableEditor({
         weekIndex,
         grid,
       });
+      setUsedLabels(await loadCustomTimetableLabels(schoolId).catch(() => usedLabels));
       setSuccess('Haftalık program kaydedildi.');
     } catch (saveError) {
       setError(saveError);
@@ -141,10 +181,16 @@ export default function ClassWeekTimetableEditor({
   return (
     <form className="class-week-timetable" onSubmit={handleSave}>
       <p className="dash-hint">
-        Her şube ve hafta için Pazartesi–Cuma günlerinde 4 dersi seçin. Öğretmenler kendi
+        Her şube ve hafta için Pazartesi–Cuma günlerinde 4 dersi seçin. Listede olmayan bir
+        etkinlik için «Özel…» seçip adını yazın (ör. Soru Çözümü, Ödev). Öğretmenler kendi
         branşlarıyla, programda ne yazarsa yazsın yoklama alabilir; turuncu not, o saatte
         gerçekte hangi dersin işlendiğini gösterir ve plandaki dersi değiştirmez.
       </p>
+      <datalist id={CUSTOM_LABELS_LIST_ID}>
+        {labelSuggestions.map((label) => (
+          <option key={label} value={label} />
+        ))}
+      </datalist>
 
       <div className="class-week-timetable__toolbar">
         <label className="dash-label">
@@ -203,13 +249,22 @@ export default function ClassWeekTimetableEditor({
                   const override = overridesByCell[`${day.id}-${slot}`];
                   const cellSlug = grid[day.id]?.[slot];
                   const cellColor = timetableSubjectColor(cellSlug);
+                  const cellIsCustom = isCustomCell(cellSlug);
                   return (
                     <td key={slot}>
                       <select
                         className={`dash-input class-week-timetable__select${cellSlug ? ' class-week-timetable__select--filled' : ''}`}
                         style={cellColor ? { '--subj-color': cellColor } : undefined}
-                        value={grid[day.id]?.[slot] ?? ''}
-                        onChange={(event) => patchCell(day.id, slot, event.target.value)}
+                        value={cellIsCustom ? CUSTOM_OPTION : (cellSlug ?? '')}
+                        onChange={(event) => {
+                          const { value } = event.target;
+                          if (value === CUSTOM_OPTION) {
+                            focusCellRef.current = `${day.id}-${slot}`;
+                            patchCell(day.id, slot, customCellValue(''));
+                          } else {
+                            patchCell(day.id, slot, value);
+                          }
+                        }}
                         disabled={loading || saving}
                         aria-label={`${day.label} ${slot}. ders`}
                       >
@@ -219,7 +274,27 @@ export default function ClassWeekTimetableEditor({
                             {subject.name}
                           </option>
                         ))}
+                        <option value={CUSTOM_OPTION}>Özel…</option>
                       </select>
+                      {cellIsCustom ? (
+                        <input
+                          type="text"
+                          className="dash-input class-week-timetable__custom-input"
+                          list={CUSTOM_LABELS_LIST_ID}
+                          value={customCellLabel(cellSlug)}
+                          maxLength={CUSTOM_LABEL_MAX}
+                          placeholder="Ders adı"
+                          onChange={(event) => patchCell(day.id, slot, customCellValue(event.target.value))}
+                          disabled={loading || saving}
+                          aria-label={`${day.label} ${slot}. ders özel ad`}
+                          ref={(node) => {
+                            if (node && focusCellRef.current === `${day.id}-${slot}`) {
+                              focusCellRef.current = null;
+                              node.focus();
+                            }
+                          }}
+                        />
+                      ) : null}
                       {override ? (
                         <p className="class-week-timetable__override-note">
                           {formatCalendarDateTr(override.sessionDate)}: {override.subjectName}

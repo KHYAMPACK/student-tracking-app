@@ -5,6 +5,41 @@ import { ATLAS_SLOT_COUNT } from './atlasLessons';
 import { TIMETABLE_SUBJECT_DEFS, teacherBranchBySlug, teacherBranchLabel } from './teacherBranches';
 
 const DIN_COLOR = '#1e3a8a';
+const CUSTOM_COLOR = '#64748b';
+
+/**
+ * A grid cell is either '' (empty), a subject slug, or a free-text activity encoded as
+ * `custom:<label>` ("Soru Çözümü", "Ödev"…). Stored as subject_slug 'custom' + custom_label.
+ */
+export const CUSTOM_CELL_PREFIX = 'custom:';
+export const CUSTOM_LABEL_MAX = 40;
+export const CUSTOM_LABEL_PRESETS = ['Soru Çözümü', 'Ödev'];
+
+export function isCustomCell(value) {
+  return typeof value === 'string' && value.startsWith(CUSTOM_CELL_PREFIX);
+}
+
+export function customCellValue(label) {
+  return `${CUSTOM_CELL_PREFIX}${label ?? ''}`;
+}
+
+export function customCellLabel(value) {
+  return isCustomCell(value) ? value.slice(CUSTOM_CELL_PREFIX.length) : '';
+}
+
+function rowCellValue(row) {
+  if (row.subject_slug === 'custom') return customCellValue(row.custom_label);
+  return row.subject_slug ?? '';
+}
+
+/** True when a custom cell was picked but never given a name (would be silently dropped on save). */
+export function hasEmptyCustomCell(grid) {
+  return TIMETABLE_WEEKDAYS.some((day) =>
+    Array.from({ length: ATLAS_SLOT_COUNT }, (_, index) => grid?.[day.id]?.[index + 1]).some(
+      (value) => isCustomCell(value) && !customCellLabel(value).trim()
+    )
+  );
+}
 
 export const TIMETABLE_WEEKDAYS = [
   { id: 1, label: 'Pazartesi', shortLabel: 'Pzt' },
@@ -15,7 +50,7 @@ export const TIMETABLE_WEEKDAYS = [
 ];
 
 export const TIMETABLE_SELECT =
-  'id, school_id, class_id, week_index, weekday, slot_index, subject_slug';
+  'id, school_id, class_id, week_index, weekday, slot_index, subject_slug, custom_label';
 
 export function isoWeekday(isoDate) {
   const day = new Date(`${isoDate}T12:00:00`).getDay();
@@ -37,7 +72,7 @@ export function rowsToTimetableGrid(rows = []) {
   const grid = emptyTimetableGrid();
   for (const row of rows) {
     if (!grid[row.weekday]) continue;
-    grid[row.weekday][row.slot_index] = row.subject_slug ?? '';
+    grid[row.weekday][row.slot_index] = rowCellValue(row);
   }
   return grid;
 }
@@ -46,9 +81,15 @@ export function timetableGridToRows(grid) {
   const rows = [];
   for (const day of TIMETABLE_WEEKDAYS) {
     for (let slot = 1; slot <= ATLAS_SLOT_COUNT; slot += 1) {
-      const slug = grid?.[day.id]?.[slot];
-      if (slug) {
-        rows.push({ weekday: day.id, slot_index: slot, subject_slug: slug });
+      const value = grid?.[day.id]?.[slot];
+      if (!value) continue;
+      if (isCustomCell(value)) {
+        const label = customCellLabel(value).trim().slice(0, CUSTOM_LABEL_MAX);
+        if (label) {
+          rows.push({ weekday: day.id, slot_index: slot, subject_slug: 'custom', custom_label: label });
+        }
+      } else {
+        rows.push({ weekday: day.id, slot_index: slot, subject_slug: value, custom_label: null });
       }
     }
   }
@@ -104,11 +145,28 @@ export async function saveTimetableWeek({ schoolId, classId, weekIndex, grid }) 
     weekday: cell.weekday,
     slot_index: cell.slot_index,
     subject_slug: cell.subject_slug,
+    custom_label: cell.custom_label,
   }));
 
   const { data, error } = await supabase.from('class_week_timetable').insert(rows).select(TIMETABLE_SELECT);
   if (error) throw error;
   return data ?? [];
+}
+
+/** Custom labels this school already uses, newest first — feeds the editor's suggestions. */
+export async function loadCustomTimetableLabels(schoolId) {
+  if (!schoolId) return [];
+  const { data, error } = await withSchoolFilter(
+    supabase
+      .from('class_week_timetable')
+      .select('custom_label')
+      .eq('subject_slug', 'custom')
+      .order('updated_at', { ascending: false })
+      .limit(200),
+    schoolId
+  );
+  if (error) throw error;
+  return [...new Set((data ?? []).map((row) => row.custom_label).filter(Boolean))];
 }
 
 export async function fillEmptyTimetableSlot({ classId, weekIndex, weekday, slotIndex }) {
@@ -135,7 +193,7 @@ export function subjectSlugFromTimetableRows(rows, weekday, slotIndex) {
   const match = (rows ?? []).find(
     (row) => row.weekday === weekday && row.slot_index === slotIndex
   );
-  return match?.subject_slug ?? null;
+  return match ? rowCellValue(match) || null : null;
 }
 
 export function resolveTimetableSubject({ rows, sessionDate, slotIndex, subjects, classGrade }) {
@@ -151,12 +209,14 @@ export function timetableWeekIndexForDate(isoDate) {
 }
 
 export function formatTimetableSubject(slug) {
+  if (isCustomCell(slug)) return customCellLabel(slug).trim();
   if (slug === 'din') return 'Din Kültürü';
   return teacherBranchLabel(slug);
 }
 
 export function timetableSubjectColor(slug) {
   if (!slug) return null;
+  if (isCustomCell(slug)) return CUSTOM_COLOR;
   if (slug === 'din') return DIN_COLOR;
   return teacherBranchBySlug(slug)?.color ?? null;
 }
