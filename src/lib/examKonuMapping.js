@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { withSchoolFilter } from './tenant';
 import { loadCurriculumSubjects, UNIT_SELECT } from './curriculum';
 import { enrichUnitsWithSubject, mapTopicToCurriculum, normalizeCurriculumText } from './studentGaps';
-import { subjectByCode } from './lgsExam';
+import { examSubjectToCurriculumSlug, subjectByCode } from './lgsExam';
 
 export const KONU_MAPPING_SELECT =
   'id, school_id, grade, subject_code, label_normalized, label_display, unit_id, section_label, created_by, created_at';
@@ -232,7 +232,9 @@ export async function saveKonuMappingsForGrades({
   for (const grade of grades) {
     let targetUnitId = unitId;
     if (unitTitle) {
-      const subject = (subjects ?? []).find((row) => row.grade === grade && row.slug === subjectCode);
+      const subject = (subjects ?? []).find(
+        (row) => row.grade === grade && row.slug === examSubjectToCurriculumSlug(subjectCode)
+      );
       if (subject) {
         const match = (units ?? []).find(
           (row) => row.subject_id === subject.id && row.title === unitTitle
@@ -288,8 +290,46 @@ export function unitsForSubjectAndGrades(units, subjectCode, grades) {
   return (units ?? []).filter(
     (unit) =>
       gradeSet.has(unit.curriculum_subjects?.grade) &&
-      unit.curriculum_subjects?.slug === subjectCode
+      unit.curriculum_subjects?.slug === examSubjectToCurriculumSlug(subjectCode)
   );
+}
+
+function matchesCurriculumExactly(label, subjectCode, units) {
+  const target = normalizeCurriculumText(label);
+  if (!target) return false;
+  const slug = examSubjectToCurriculumSlug(subjectCode);
+  return (units ?? []).some((unit) => {
+    const unitSlug = unit.curriculum_subjects?.slug ?? unit.subject?.slug;
+    if (unitSlug && unitSlug !== slug) return false;
+    if (normalizeCurriculumText(unit.title) === target) return true;
+    return (unit.sections ?? []).some(
+      (section) =>
+        normalizeCurriculumText(typeof section === 'string' ? section : section?.title ?? section?.name) ===
+        target
+    );
+  });
+}
+
+/**
+ * Key files can carry several topic names per question (e.g. publisher "konu" and MEB
+ * ünite). Keep the primary label unless an alternate matches a curriculum unit/section
+ * (or a saved mapping) exactly — loose matching is left to the normal resolve flow.
+ */
+export function preferResolvableTopicLabels({ questions = [], units = [], mappingLookup = null }) {
+  return questions.map((question) => {
+    const alternates = question.topic_alternates;
+    if (!alternates?.length) return question;
+    const candidates = [question.topic_label, ...alternates].filter(
+      (label, index, all) => label && all.indexOf(label) === index
+    );
+    for (const label of candidates) {
+      const stored = mappingLookup?.get(`${question.subject_code}::${normalizeCurriculumText(label)}`);
+      if (stored || matchesCurriculumExactly(label, question.subject_code, units)) {
+        return { ...question, topic_label: label };
+      }
+    }
+    return question;
+  });
 }
 
 export function sectionOptionsForUnit(unit) {

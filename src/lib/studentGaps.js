@@ -1,4 +1,9 @@
-import { buildProgressSeries, LGS_SUBJECTS, subjectByCode } from './lgsExam';
+import {
+  buildProgressSeries,
+  examSubjectToCurriculumSlug,
+  LGS_SUBJECTS,
+  subjectByCode,
+} from './lgsExam';
 import { buildErrorReport } from './examAnalysis';
 
 export const GAP_SUCCESS_THRESHOLD = 50;
@@ -89,7 +94,7 @@ export function mapTopicToCurriculum(
   const subjectUnits = subjectCode
     ? units.filter((unit) => {
         const subject = unit.curriculum_subjects ?? unit.subject;
-        if (subject?.slug) return subject.slug === subjectCode;
+        if (subject?.slug) return subject.slug === examSubjectToCurriculumSlug(subjectCode);
         if (unit.subject_id && subjectCode) {
           const slug = subjectByCode(subjectCode)?.code;
           return unit.subject_slug === slug || unit.subject_code === subjectCode;

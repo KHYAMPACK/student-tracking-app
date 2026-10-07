@@ -10,12 +10,15 @@ import {
   downloadAnswerKeyTemplate,
   parseAnswerKeyCsv,
 } from '../../lib/examAnswerKeyImport';
+import { parseAnswerKeyXlsx } from '../../lib/examKeyXlsxImport';
 import {
   downloadOptikTemplate,
   matchOptikEntriesToStudents,
   parseOptikExamCsv,
   saveOptikImport,
 } from '../../lib/examOptikImport';
+import { decodeOptikBytes, parseOptikTxt } from '../../lib/examOptikTxtImport';
+import { matchOptikTxtEntries, rowNeedsDecision } from '../../lib/examNameMatch';
 import { InlineError, SuccessMessage } from '../dashboardUi';
 import AnswerKeyReviewGrid from './AnswerKeyReviewGrid';
 import KonuEslestirmeDialog from './KonuEslestirmeDialog';
@@ -23,6 +26,7 @@ import OgrenciImportOnayDialog from './OgrenciImportOnayDialog';
 import {
   findUnknownKonuFromQuestions,
   loadExamKonuContext,
+  preferResolvableTopicLabels,
   resolveAudienceGrades,
   saveKonuMappingBatch,
 } from '../../lib/examKonuMapping';
@@ -33,6 +37,10 @@ const WIZARD_STEPS = [
   { id: 'upload-students', label: 'Öğrenci cevapları' },
   { id: 'review-students', label: 'Öğrenci onayı' },
 ];
+
+function previewRowKey(row) {
+  return row.rowNumber ?? row.student_number ?? row.studentName ?? 'row';
+}
 
 function resolveInitialStep(answerKeyId) {
   return answerKeyId ? 'upload-students' : 'upload-key';
@@ -76,6 +84,7 @@ export default function ExamCsvImportWizard({
   session,
   schoolId,
   students = [],
+  classes = [],
   answerKeyId,
   onAnswerKeySaved,
   onResultsSaved,
@@ -91,6 +100,8 @@ export default function ExamCsvImportWizard({
 
   const [draftQuestions, setDraftQuestions] = useState([]);
   const [draftWarnings, setDraftWarnings] = useState([]);
+  const [keyMeta, setKeyMeta] = useState(null);
+  const [studentFileWarnings, setStudentFileWarnings] = useState([]);
   const [savedQuestions, setSavedQuestions] = useState([]);
   const [studentPreview, setStudentPreview] = useState([]);
   const [questionCount, setQuestionCount] = useState(0);
@@ -112,6 +123,8 @@ export default function ExamCsvImportWizard({
     setSuccess(null);
     setDraftQuestions([]);
     setDraftWarnings([]);
+    setKeyMeta(null);
+    setStudentFileWarnings([]);
     setStudentPreview([]);
     setExpandedRows(new Set());
     setLocalAnswerKeyId(null);
@@ -135,7 +148,9 @@ export default function ExamCsvImportWizard({
 
   const reviewQuestions = savedQuestions.length ? savedQuestions : draftQuestions;
 
-  const matchedCount = studentPreview.filter((row) => row.student_id).length;
+  const importCount = studentPreview.filter((row) => row.student_id && !row.external).length;
+  const externalCount = studentPreview.filter((row) => row.external).length;
+  const pendingCount = studentPreview.filter(rowNeedsDecision).length;
 
   function patchDraftQuestion(index, field, value) {
     setDraftQuestions((current) =>
@@ -151,29 +166,32 @@ export default function ExamCsvImportWizard({
     setError(null);
     setSuccess(null);
     try {
-      const text = await file.text();
-      const parsed = parseAnswerKeyCsv(text);
+      const isExcel = /\.xlsx?$/i.test(file.name);
+      const parsed = isExcel
+        ? parseAnswerKeyXlsx(await file.arrayBuffer())
+        : parseAnswerKeyCsv(await file.text());
       setDraftQuestions(parsed.questions);
       setDraftWarnings(parsed.warnings);
+      setKeyMeta(parsed.meta ?? null);
       setStep('review-key');
     } catch (fileError) {
       setError(fileError);
     }
   }
 
-  async function persistAnswerKey() {
+  async function persistAnswerKey(questions = draftQuestions) {
     const keyRow = await saveAnswerKeyWithQuestions({
       schoolId,
       sessionId: session.id,
       title: session.title || 'Cevap anahtarı',
-      questions: draftQuestions,
+      questions,
     });
     setLocalAnswerKeyId(keyRow.id);
     recordSchoolActivity(supabase, profile, {
       schoolId,
       category: 'exam',
       action: 'saved',
-      summary: `Cevap anahtarı: ${session.title ?? 'Deneme'} · ${draftQuestions.length} soru`,
+      summary: `Cevap anahtarı: ${session.title ?? 'Deneme'} · ${questions.length} soru`,
     });
     setSuccess('Cevap anahtarı kaydedildi. Şimdi öğrenci cevaplarını yükleyin.');
     setDraftWarnings([]);
@@ -192,8 +210,14 @@ export default function ExamCsvImportWizard({
       }
 
       const context = await loadExamKonuContext(schoolId, audienceGrades);
-      const unknown = findUnknownKonuFromQuestions({
+      const prepared = preferResolvableTopicLabels({
         questions: draftQuestions,
+        units: context.allUnits,
+        mappingLookup: context.mappingLookup,
+      });
+      setDraftQuestions(prepared);
+      const unknown = findUnknownKonuFromQuestions({
+        questions: prepared,
         units: context.allUnits,
         mappingLookup: context.mappingLookup,
       });
@@ -205,7 +229,7 @@ export default function ExamCsvImportWizard({
         return;
       }
 
-      await persistAnswerKey();
+      await persistAnswerKey(prepared);
     } catch (saveError) {
       setError(saveError);
     } finally {
@@ -242,12 +266,29 @@ export default function ExamCsvImportWizard({
     setError(null);
     setSuccess(null);
     try {
-      const text = await file.text();
-      const parsed = parseOptikExamCsv(text);
-      const matched = matchOptikEntriesToStudents(parsed.entries, students);
+      let matched;
+      let columnCount;
+      setStudentFileWarnings([]);
+      if (/\.txt$/i.test(file.name)) {
+        const questions = savedQuestions.length
+          ? savedQuestions
+          : await loadQuestionsForAnswerKey(activeAnswerKeyId);
+        const parsed = parseOptikTxt(decodeOptikBytes(await file.arrayBuffer()));
+        matched = matchOptikTxtEntries(parsed.entries, students, {
+          questions,
+          grades: audienceGrades,
+          classes,
+        });
+        columnCount = questions.length;
+        setStudentFileWarnings(parsed.warnings);
+      } else {
+        const parsed = parseOptikExamCsv(await file.text());
+        matched = matchOptikEntriesToStudents(parsed.entries, students);
+        columnCount = parsed.questionHeaders.length;
+      }
       setStudentPreview(matched);
-      setQuestionCount(parsed.questionHeaders.length);
-      setExpandedRows(new Set());
+      setQuestionCount(columnCount);
+      setExpandedRows(new Set(matched.filter(rowNeedsDecision).map(previewRowKey)));
       setStudentFilter('all');
       setStudentDialogOpen(true);
     } catch (fileError) {
@@ -256,20 +297,41 @@ export default function ExamCsvImportWizard({
     }
   }
 
-  function handleAssignStudent(rowKey, studentId) {
+  function patchStudentRow(rowKey, buildPatch) {
     setStudentPreview((current) =>
-      current.map((row) => {
-        const key = row.rowNumber ?? row.student_number ?? row.studentName ?? 'row';
-        if (key !== rowKey) return row;
-        const student = students.find((item) => item.id === studentId);
-        return {
-          ...row,
-          student_id: studentId,
-          studentName: student?.full_name ?? row.studentName,
-          student_number: student?.student_number ?? row.student_number,
-        };
-      })
+      current.map((row) => (previewRowKey(row) === rowKey ? { ...row, ...buildPatch(row) } : row))
     );
+  }
+
+  function handleAssignStudent(rowKey, studentId) {
+    const student = students.find((item) => item.id === studentId) ?? null;
+    patchStudentRow(rowKey, (row) =>
+      student
+        ? {
+            student_id: student.id,
+            matchedStudent: student,
+            studentName: student.full_name,
+            student_number: student.student_number ?? row.student_number,
+            matchStatus: 'manual',
+            confirmed: true,
+            external: false,
+          }
+        : {
+            student_id: null,
+            matchedStudent: null,
+            studentName: row.student_name ?? row.studentName,
+            matchStatus: 'unmatched',
+            confirmed: false,
+          }
+    );
+  }
+
+  function handleConfirmRow(rowKey) {
+    patchStudentRow(rowKey, () => ({ confirmed: true }));
+  }
+
+  function handleMarkExternal(rowKey, external) {
+    patchStudentRow(rowKey, () => ({ external }));
   }
 
   function handleToggleRow(rowKey, isOpen) {
@@ -290,7 +352,10 @@ export default function ExamCsvImportWizard({
       const questions = savedQuestions.length
         ? savedQuestions
         : await loadQuestionsForAnswerKey(activeAnswerKeyId);
-      const matchedEntries = studentPreview.filter((row) => row.student_id);
+      if (pendingCount > 0) {
+        throw new Error(`${pendingCount} satır için karar bekleniyor.`);
+      }
+      const matchedEntries = studentPreview.filter((row) => row.student_id && !row.external);
       if (!matchedEntries.length) {
         throw new Error('İçe aktarmak için en az bir eşleşen öğrenci gerekli.');
       }
@@ -304,10 +369,11 @@ export default function ExamCsvImportWizard({
         schoolId,
         category: 'exam',
         action: 'saved',
-        summary: `CSV import: ${session.title ?? 'Deneme'} · ${result.studentCount} öğrenci`,
+        summary: `Optik import: ${session.title ?? 'Deneme'} · ${result.studentCount} öğrenci`,
       });
       setSuccess(
-        `${result.studentCount} öğrenci, ${result.answerCount} cevap içe aktarıldı.`
+        `${result.studentCount} öğrenci, ${result.answerCount} cevap içe aktarıldı.` +
+          (externalCount ? ` ${externalCount} dışarıdan katılan öğrenci atlandı.` : '')
       );
       setStudentPreview([]);
       setComplete(true);
@@ -356,6 +422,8 @@ export default function ExamCsvImportWizard({
         expandedRows={expandedRows}
         onToggleRow={handleToggleRow}
         onAssignStudent={handleAssignStudent}
+        onConfirmRow={handleConfirmRow}
+        onMarkExternal={handleMarkExternal}
         saving={saving}
         onCancel={() => {
           if (saving) return;
@@ -394,19 +462,24 @@ export default function ExamCsvImportWizard({
 
       {!complete && step === 'upload-key' ? (
         <div className="exam-import-wizard__step-panel">
-          <h3 className="exam-workspace-block__title">1. Cevap anahtarı CSV</h3>
+          <h3 className="exam-workspace-block__title">1. Cevap anahtarı</h3>
           <p className="dash-hint">
-            Önce yayınevi cevap anahtarı dosyasını yükleyin. Sütunlar: question_index, subject_code,
-            correct_choice, topic_label (veya Türkçe karşılıkları).
+            Yayınevi cevap anahtarını Excel (.xlsx: her ders için A ve B kitapçığı sütunlu) veya CSV
+            (question_index, subject_code, correct_choice, topic_label) olarak yükleyin.
           </p>
           <div className="exam-import-wizard__actions">
             <button type="button" className="demo-btn demo-btn--ghost" onClick={downloadAnswerKeyTemplate}>
-              Şablon indir
+              CSV şablonu indir
             </button>
           </div>
           <label className="dash-label">
-            Cevap anahtarı CSV
-            <input className="dash-input" type="file" accept=".csv,text/csv" onChange={handleAnswerKeyFile} />
+            Cevap anahtarı dosyası
+            <input
+              className="dash-input"
+              type="file"
+              accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={handleAnswerKeyFile}
+            />
           </label>
         </div>
       ) : null}
@@ -415,6 +488,7 @@ export default function ExamCsvImportWizard({
         <div className="exam-import-wizard__step-panel">
           <h3 className="exam-workspace-block__title">2. Cevap anahtarını onayla</h3>
           <p className="dash-hint">
+            {keyMeta?.examName ? `${keyMeta.examName} · ` : ''}
             {draftQuestions.length} soru
             {draftWarnings.length ? ` · ${draftWarnings.length} uyarı` : ''}
             {' · '}
@@ -449,14 +523,16 @@ export default function ExamCsvImportWizard({
 
       {!complete && step === 'upload-students' ? (
         <div className="exam-import-wizard__step-panel">
-          <h3 className="exam-workspace-block__title">3. Öğrenci cevapları CSV</h3>
+          <h3 className="exam-workspace-block__title">3. Öğrenci cevapları</h3>
           {!activeAnswerKeyId ? (
             <p className="dash-hint">Öğrenci cevaplarını yüklemeden önce cevap anahtarını kaydedin.</p>
           ) : (
             <>
               <p className="dash-hint">
-                Optik format: okul_no, ad_soyad, s1…s{reviewQuestions.length || 90}. Yükledikten sonra
-                öğrenci listesini onaylayacaksınız.
+                Optik okuyucu çıktısı (.txt) veya CSV (okul_no, ad_soyad, s1…s
+                {reviewQuestions.length || 90}). Kitapçık (A/B) otomatik ayrılır. Eşleşmeyen veya
+                tahminle eşleşen öğrenciler için sizden onay istenir; sınava dışarıdan katılanları
+                «Dışarıdan katılıyor» ile atlarsınız (her denemede yeniden sorulur).
               </p>
               <div className="exam-import-wizard__actions">
                 <button type="button" className="demo-btn demo-btn--ghost" onClick={downloadOptikTemplate}>
@@ -467,9 +543,24 @@ export default function ExamCsvImportWizard({
                 </button>
               </div>
               <label className="dash-label">
-                Öğrenci cevapları CSV
-                <input className="dash-input" type="file" accept=".csv,text/csv" onChange={handleStudentFile} />
+                Öğrenci cevapları dosyası
+                <input
+                  className="dash-input"
+                  type="file"
+                  accept=".txt,.csv,text/plain,text/csv"
+                  onChange={handleStudentFile}
+                />
               </label>
+              {studentFileWarnings.length ? (
+                <ul className="exam-import-wizard__warnings">
+                  {studentFileWarnings.slice(0, 5).map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                  {studentFileWarnings.length > 5 ? (
+                    <li>… ve {studentFileWarnings.length - 5} uyarı daha</li>
+                  ) : null}
+                </ul>
+              ) : null}
               {studentPreview.length && !studentDialogOpen ? (
                 <div className="exam-import-wizard__actions">
                   <button
@@ -477,7 +568,8 @@ export default function ExamCsvImportWizard({
                     className="demo-btn demo-btn--primary"
                     onClick={() => setStudentDialogOpen(true)}
                   >
-                    Öğrenci eşleştirmesini aç ({matchedCount}/{studentPreview.length})
+                    Öğrenci onayını aç ({importCount} aktarılacak
+                    {pendingCount ? ` · ${pendingCount} karar bekliyor` : ''})
                   </button>
                 </div>
               ) : null}

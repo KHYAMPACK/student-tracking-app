@@ -61,6 +61,7 @@ function ExamSessionWorkspace({
         session={session}
         schoolId={schoolId}
         students={students}
+        classes={classes}
         answerKeyId={session.answer_key_id}
         onAnswerKeySaved={onAnswerKeySaved}
         onResultsSaved={onResultsSaved}

@@ -21,6 +21,11 @@ export function subjectByCode(code) {
   return LGS_SUBJECTS.find((s) => s.code === code) ?? null;
 }
 
+/** İnkılap questions are taught under the curriculum's "sosyal" subject. */
+export function examSubjectToCurriculumSlug(subjectCode) {
+  return subjectCode === 'inkilap' ? 'sosyal' : subjectCode;
+}
+
 export function computeNet(correct, wrong) {
   const c = Number(correct) || 0;
   const w = Number(wrong) || 0;
