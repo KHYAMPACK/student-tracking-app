@@ -18,6 +18,7 @@ import {
   buildAttendanceRecords,
   canLiveLogForDate,
   canLogAtlasSession,
+  loadAtlasAttendanceForSessions,
   loadClassRoster,
   loadClassSessionsForDate,
   loadTeacherWeekSessions,
@@ -30,6 +31,7 @@ import {
 import { resolveMissedDayPromptForDate } from '../../lib/atlasAlerts';
 import { recordSchoolActivity } from '../../lib/activityLog';
 import { notifyAttendanceFirstLesson } from '../../lib/attendanceNotifications';
+import { profileHasRole } from '../../lib/profileRoles';
 import { InlineError, SendButton, SuccessMessage } from '../dashboardUi';
 import { AnimatedView } from '../ui/AnimatedView';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -37,13 +39,21 @@ import AtlasClassPicker from './AtlasClassPicker';
 import {
   fillEmptyTimetableSlot,
   formatTimetableSubject,
+  isCustomCell,
   isoWeekday,
   loadTimetableForWeek,
   resolveTimetableSubject,
   subjectSlugFromTimetableRows,
 } from '../../lib/classWeekTimetable';
 
-function SlotStrip({ sessions, selectedSlot, onSelectSlot, disabled, plannedBySlot }) {
+function SlotStrip({
+  sessions,
+  selectedSlot,
+  onSelectSlot,
+  disabled,
+  plannedBySlot,
+  canEditSession,
+}) {
   const filledBySlot = useMemo(() => {
     const map = new Map();
     for (const session of sessions) {
@@ -59,6 +69,7 @@ function SlotStrip({ sessions, selectedSlot, onSelectSlot, disabled, plannedBySl
         const existing = filledBySlot.get(slot);
         const planned = plannedBySlot?.get(slot);
         const isFilled = Boolean(existing);
+        const isEditable = isFilled && Boolean(canEditSession?.(existing));
         const isSelected = selectedSlot === slot;
         return (
           <button
@@ -68,11 +79,12 @@ function SlotStrip({ sessions, selectedSlot, onSelectSlot, disabled, plannedBySl
             className={[
               'atlas-slot-strip__btn',
               isFilled ? 'atlas-slot-strip__btn--filled' : '',
+              isEditable ? 'atlas-slot-strip__btn--editable' : '',
               isSelected ? 'atlas-slot-strip__btn--active' : '',
             ]
               .filter(Boolean)
               .join(' ')}
-            disabled={disabled || isFilled}
+            disabled={disabled || (isFilled && !isEditable)}
             aria-selected={isSelected}
             onClick={() => onSelectSlot(slot)}
           >
@@ -85,6 +97,7 @@ function SlotStrip({ sessions, selectedSlot, onSelectSlot, disabled, plannedBySl
             ) : (
               <span className="atlas-slot-strip__meta">{planned || 'Boş'}</span>
             )}
+            {isEditable ? <span className="atlas-slot-strip__edit">Düzelt</span> : null}
           </button>
         );
       })}
@@ -231,6 +244,9 @@ export default function TeacherAtlasLessons({
   );
   const plannedSubject = slotSubject.subject;
   const slotSubjectSlug = slotSubject.subjectSlug;
+  // "Soru Çözümü", "Ödev"… — a free-text cell, not a müfredat subject, so it never counts as
+  // a branş mismatch; the teacher still logs attendance under their own branş.
+  const isCustomSlot = isCustomCell(slotSubjectSlug);
 
   // Own branş, resolved against this class's grade — used to log attendance even when the
   // weekly schedule is empty or planned for a different subject (director/counselor never
@@ -243,7 +259,8 @@ export default function TeacherAtlasLessons({
 
   const subject = ownSubject ?? plannedSubject;
   const isEmptySlot = !slotSubjectSlug;
-  const isSubjectMismatch = Boolean(slotSubjectSlug) && Boolean(ownSubject) && slotSubjectSlug !== ownSubjectSlug;
+  const isSubjectMismatch =
+    Boolean(slotSubjectSlug) && !isCustomSlot && Boolean(ownSubject) && slotSubjectSlug !== ownSubjectSlug;
 
   const subjectUnits = useMemo(
     () => units.filter((unit) => unit.subject_id === subject?.id),
@@ -279,6 +296,26 @@ export default function TeacherAtlasLessons({
     () => classSessions.map((session) => session.slot_index),
     [classSessions]
   );
+  const nextEmptySlot = nextEmptySlotIndex(filledSlots);
+
+  // A saved slot can be corrected by whoever took it (or a director) inside the same window
+  // that allows logging it (until 20:00 today, or any earlier school day this week).
+  const isDirector = profileHasRole(profile, 'director');
+  const canEditSession = useCallback(
+    (session) => canLog && (session.taken_by === profile.id || isDirector),
+    [canLog, profile.id, isDirector]
+  );
+  const activeSession =
+    classSessions.find(
+      (session) =>
+        session.slot_index === slotIndex &&
+        session.class_id === klass?.id &&
+        session.session_date === sessionDate
+    ) ?? null;
+  const correctionSession = activeSession && canEditSession(activeSession) ? activeSession : null;
+  const correctionSessionId = correctionSession?.id ?? null;
+  const isCorrection = Boolean(correctionSession);
+  const correctionReady = isCorrection && sessionId === correctionSessionId;
 
   const plannedBySlot = useMemo(() => {
     const map = new Map();
@@ -392,15 +429,38 @@ export default function TeacherAtlasLessons({
       setSlotIndex(effectiveCatchUp.slotIndex);
       return;
     }
-    const next = nextEmptySlotIndex(filledSlots);
-    if (next) setSlotIndex(next);
-  }, [filledSlots, effectiveCatchUp?.slotIndex, klass?.id, sessionDate, sessionId]);
+    if (nextEmptySlot) setSlotIndex(nextEmptySlot);
+  }, [nextEmptySlot, effectiveCatchUp?.slotIndex, klass?.id, sessionDate]);
 
   useEffect(() => {
     setAbsentIds(new Set());
     setSessionId(null);
     setSuccess(null);
   }, [selectedClassId, slotIndex, sessionDate]);
+
+  useEffect(() => {
+    if (!correctionSessionId) {
+      setSessionId(null);
+      setAbsentIds(new Set());
+      return undefined;
+    }
+    let mounted = true;
+    (async () => {
+      try {
+        const rows = await loadAtlasAttendanceForSessions([correctionSessionId]);
+        if (!mounted) return;
+        setAbsentIds(
+          new Set(rows.filter((row) => row.status === 'absent').map((row) => row.student_id))
+        );
+        setSessionId(correctionSessionId);
+      } catch (loadError) {
+        if (mounted) setError(loadError);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [correctionSessionId]);
 
   function toggleAbsent(studentId) {
     setAbsentIds((current) => {
@@ -431,8 +491,50 @@ export default function TeacherAtlasLessons({
     if (next) setSlotIndex(next);
   }
 
+  async function performSaveCorrection() {
+    if (!correctionSession || !klass?.id || !sessionDate) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      // Subject, week and unit are replayed from the saved session so a correction can
+      // never re-assign the slot; only the present/absent marks change. No parent push.
+      await saveAtlasLessonAttendance({
+        classId: klass.id,
+        subjectId: correctionSession.subject_id,
+        sessionDate,
+        slotIndex,
+        weekIndex: correctionSession.week_index,
+        unitId: correctionSession.unit_id,
+        records: buildAttendanceRecords(students, absentIds),
+        sessionId: correctionSession.id,
+      });
+      recordSchoolActivity(supabase, profile, {
+        schoolId,
+        category: 'atlas',
+        action: 'corrected',
+        summary: `Atlas ders yoklaması düzeltildi: ${formatClassLabel(klass?.grade, klass?.name)} · ${slotIndex}. ders`,
+        metadata: { sessionId: correctionSession.id, sessionDate, slotIndex },
+      });
+      await refreshClassSessions(klass.id, sessionDate);
+      setSuccess('Yoklama güncellendi.');
+    } catch (saveError) {
+      setError(saveError);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleSaveAttendance(event) {
     event.preventDefault();
+    if (isCorrection) {
+      if (!canLog) {
+        setError(new Error('Düzeltme canlı kayıt süresi (20:00) ve aynı hafta içinde yapılabilir.'));
+        return;
+      }
+      if (correctionReady) performSaveCorrection();
+      return;
+    }
     if (!klass?.id || !subject?.id || !sessionDate || !snapshot) {
       if (!subject?.id) {
         setError(new Error('Bu ders saati için program girilmemiş.'));
@@ -539,7 +641,7 @@ export default function TeacherAtlasLessons({
     );
   }
 
-  if (selectedClassId && slotSubjectSlug && !isSubjectMismatch && !plannedSubject?.id) {
+  if (selectedClassId && slotSubjectSlug && !isCustomSlot && !isSubjectMismatch && !plannedSubject?.id) {
     return (
       <section className="director-panel">
         <h2 className="dash-section-title">Ders</h2>
@@ -664,8 +766,9 @@ export default function TeacherAtlasLessons({
             onSelectSlot={setSlotIndex}
             disabled={saving}
             plannedBySlot={plannedBySlot}
+            canEditSession={canEditSession}
           />
-          {isEmptySlot && ownSubject ? (
+          {activeSession ? null : isEmptySlot && ownSubject ? (
             <p className="dash-hint">
               Bu ders saati için program girilmemiş. {ownSubject.name} olarak yoklama
               alabilirsiniz; kaydettiğinizde haftalık program da buna göre doldurulur.
@@ -674,6 +777,14 @@ export default function TeacherAtlasLessons({
             <p className="dash-hint">
               Bu ders saati için program girilmemiş. Müdür veya rehberlikçi Haftalık ders
               programından doldurmalı.
+            </p>
+          ) : isCustomSlot ? (
+            <p className="dash-hint">
+              Bu ders saati haftalık programda «{formatTimetableSubject(slotSubjectSlug)}» olarak
+              planlı.{' '}
+              {ownSubject
+                ? `${ownSubject.name} olarak yoklama alabilirsiniz; haftalık programdaki plan değişmeden kalır.`
+                : 'Yoklama için branşınızın bu şubenin sınıf düzeyine uygun olması gerekir.'}
             </p>
           ) : isSubjectMismatch ? (
             <p className="dash-hint">
@@ -685,8 +796,25 @@ export default function TeacherAtlasLessons({
       ) : null}
 
       <form className="dash-form" onSubmit={handleSaveAttendance}>
-        <h3 className="dash-section-title">Yoklama · {slotIndex}. ders</h3>
-        <p className="dash-hint">Varsayılan: var. Devamsız öğrenciye dokunun.</p>
+        <h3 className="dash-section-title">
+          Yoklama · {slotIndex}. ders{isCorrection ? ' · düzeltme' : ''}
+        </h3>
+        {isCorrection ? (
+          <>
+            <p className="dash-hint">
+              Kayıtlı yoklama yüklendi. Değişikliği yapıp güncelleyin; velilere yeni bildirim
+              gitmez.
+            </p>
+            {correctionSession.lesson_type === 'practice' && correctionSession.activity_completed_at ? (
+              <p className="dash-hint">
+                Bu derse soru girişi yapılmış: devamsız olarak işaretlediğiniz öğrencilerin soru
+                sonuçları silinir.
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p className="dash-hint">Varsayılan: var. Devamsız öğrenciye dokunun.</p>
+        )}
         <ul className="atlas-roster">
           {students.map((student) => {
             const absent = absentIds.has(student.id);
@@ -695,6 +823,7 @@ export default function TeacherAtlasLessons({
                 <button
                   type="button"
                   className={`atlas-roster__btn${absent ? ' atlas-roster__btn--absent' : ''}`}
+                  disabled={isCorrection && !correctionReady}
                   onClick={() => toggleAbsent(student.id)}
                 >
                   <span>{student.full_name}</span>
@@ -709,9 +838,11 @@ export default function TeacherAtlasLessons({
         ) : (
           <SendButton
             sending={saving}
-            disabled={filledSlots.includes(slotIndex) || !subject?.id}
-            label="Yoklamayı kaydet"
-            sendingLabel="Kaydediliyor…"
+            disabled={
+              isCorrection ? !correctionReady : filledSlots.includes(slotIndex) || !subject?.id
+            }
+            label={isCorrection ? 'Yoklamayı güncelle' : 'Yoklamayı kaydet'}
+            sendingLabel={isCorrection ? 'Güncelleniyor…' : 'Kaydediliyor…'}
           />
         )}
       </form>
