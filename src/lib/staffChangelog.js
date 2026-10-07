@@ -54,7 +54,7 @@ export const STAFF_CHANGELOG = [
           'Öğrenci cevapları .txt olarak yüklenir. A ve B kitapçığı otomatik ayrılır, adlar öğrenci listesiyle eşleştirilir (Türkçe harf, boşluk, eksik ikinci ad ve okunamayan harfler tolere edilir). Tam eşleşenler sorulmadan geçer; eşleşmeyen, tahminle eşleşen veya kitapçığı şüpheli satırlar için sizden karar istenir.',
         steps: [
           'Cevap anahtarı kaydedildikten sonra «Öğrenci cevapları» adımında .txt dosyasını seçin.',
-          'Onay ekranında «Karar bekleyen» satırlara bakın: öğrenciyi seçin, «Doğru, onayla» deyin veya «Dışarıdan katılıyor» ile atlayın.',
+          'Onay ekranı yalnızca karar bekleyen satırları gösterir ve her seferinde tek satır açıktır: öğrenciyi seçin, «Doğru, onayla» deyin veya «Dışarıdan katılıyor» ile atlayın. Yanlışlık olursa «Verilen kararlar» bölümünden «Geri al» diyebilirsiniz.',
           'Bekleyen kalmayınca «Onayla ve içe aktar»a basın.',
         ],
         roles: ['director', 'counselor'],

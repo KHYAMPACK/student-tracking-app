@@ -7,7 +7,13 @@ function rowKeyOf(row) {
   return row.rowNumber ?? row.student_number ?? row.studentName ?? 'row';
 }
 
-function StudentReviewRow({
+function decisionText(row) {
+  if (row.decision === 'external') return 'Dışarıdan katılıyor';
+  const name = row.matchedStudent?.full_name ?? '';
+  return row.decision === 'confirmed' ? `${name} (onaylandı)` : name;
+}
+
+function PendingRow({
   row,
   questions,
   students,
@@ -20,18 +26,11 @@ function StudentReviewRow({
 }) {
   const stats = useMemo(() => previewOptikEntryStats(row, questions), [row, questions]);
   const rowKey = rowKeyOf(row);
-  const external = Boolean(row.external);
-  const matched = Boolean(row.student_id) && !external;
-  const needsDecision = rowNeedsDecision(row);
-
-  let badge = { label: 'Eşleşti', tone: 'ok' };
-  if (external) badge = { label: 'Dışarıdan', tone: 'muted' };
-  else if (!row.student_id) badge = { label: 'Eşleşmedi', tone: 'warn' };
-  else if (needsDecision) badge = { label: 'Onay bekliyor', tone: 'warn' };
+  const hasStudent = Boolean(row.student_id);
 
   return (
     <details
-      className={`exam-import-review-row${expanded ? ' exam-import-review-row--open' : ''}${needsDecision ? ' exam-import-review-row--issue' : ''}`}
+      className={`exam-import-review-row exam-import-review-row--issue${expanded ? ' exam-import-review-row--open' : ''}`}
       open={expanded}
       onToggle={(event) => onToggle(rowKey, event.currentTarget.open)}
     >
@@ -40,14 +39,11 @@ function StudentReviewRow({
           {row.studentName || row.student_number || '—'}
         </span>
         <span className="exam-import-review-row__meta">
-          {row.student_number ? <span className="dash-hint">No {row.student_number}</span> : null}
           {row.booklet ? <span className="dash-hint">Kitapçık {row.booklet}</span> : null}
-          <span
-            className={`exam-student-review__badge${badge.tone === 'ok' ? ' exam-student-review__badge--ok' : badge.tone === 'warn' ? ' exam-student-review__badge--warn' : ''}`}
-          >
-            {badge.label}
+          <span className="exam-student-review__badge exam-student-review__badge--warn">
+            {hasStudent ? 'Onay bekliyor' : 'Eşleşmedi'}
           </span>
-          {matched ? (
+          {hasStudent ? (
             <span className="dash-hint">
               Net {stats.totalNet.toFixed(2)} · D {stats.totalCorrect} / Y {stats.totalWrong} / B{' '}
               {stats.totalBlank}
@@ -64,102 +60,41 @@ function StudentReviewRow({
           </ul>
         ) : null}
 
-        {external ? (
-          <div className="exam-import-wizard__actions">
-            <p className="dash-hint">Dışarıdan katılıyor; bu satır içe aktarılmayacak.</p>
+        <label className="dash-label exam-import-review-row__assign">
+          {hasStudent ? 'Başka öğrenci seç' : 'Öğrenci eşleştir'}
+          <select
+            className="dash-input"
+            value={row.student_id ?? ''}
+            onChange={(event) => onAssignStudent(rowKey, event.target.value || null)}
+          >
+            <option value="">Seçin…</option>
+            {students.map((student) => {
+              const taken = usedStudentIds.has(student.id) && student.id !== row.student_id;
+              return (
+                <option key={student.id} value={student.id} disabled={taken}>
+                  {student.full_name}
+                  {student.student_number ? ` · ${student.student_number}` : ''}
+                  {taken ? ' · başka satırda' : ''}
+                </option>
+              );
+            })}
+          </select>
+        </label>
+
+        <div className="exam-import-review-row__actions">
+          {hasStudent ? (
             <button
               type="button"
-              className="demo-btn demo-btn--ghost"
-              onClick={() => onMarkExternal(rowKey, false)}
+              className="demo-btn demo-btn--primary"
+              onClick={() => onConfirmRow(rowKey)}
             >
-              Geri al
+              Doğru, onayla
             </button>
-          </div>
-        ) : needsDecision ? (
-          <>
-            <label className="dash-label exam-import-review-row__assign">
-              {row.student_id ? 'Başka öğrenci seç' : 'Öğrenci eşleştir'}
-              <select
-                className="dash-input"
-                value={row.student_id ?? ''}
-                onChange={(event) => onAssignStudent(rowKey, event.target.value || null)}
-              >
-                <option value="">Seçin…</option>
-                {students.map((student) => {
-                  const taken = usedStudentIds.has(student.id) && student.id !== row.student_id;
-                  return (
-                    <option key={student.id} value={student.id} disabled={taken}>
-                      {student.full_name}
-                      {student.student_number ? ` · ${student.student_number}` : ''}
-                      {taken ? ' · başka satırda' : ''}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-            <div className="exam-import-wizard__actions">
-              {row.student_id ? (
-                <button
-                  type="button"
-                  className="demo-btn demo-btn--primary"
-                  onClick={() => onConfirmRow(rowKey)}
-                >
-                  Doğru, onayla
-                </button>
-              ) : null}
-              <button type="button" className="demo-btn" onClick={() => onMarkExternal(rowKey, true)}>
-                Dışarıdan katılıyor
-              </button>
-            </div>
-          </>
-        ) : null}
-
-        {!external ? (
-          <>
-            <div className="exam-student-review__subjects">
-              {stats.subjects
-                .filter((subject) => subject.correct + subject.wrong + subject.blank > 0)
-                .map((subject) => (
-                  <span key={subject.subject_code} className="exam-student-review__subject-chip">
-                    {subject.shortLabel}: {subject.net.toFixed(1)} net
-                  </span>
-                ))}
-            </div>
-
-            <div className="exam-grid-wrap">
-              <table className="exam-entry-grid exam-student-review__grid">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>CVP</th>
-                    <th>Öğr.</th>
-                    <th>Durum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(questions ?? []).map((question) => {
-                    const choice = row.choices?.[question.question_index] ?? '';
-                    let status = 'blank';
-                    if (choice) {
-                      status = choice === question.correct_choice ? 'correct' : 'wrong';
-                    }
-                    return (
-                      <tr
-                        key={question.question_index}
-                        className={`exam-student-review__choice exam-student-review__choice--${status}`}
-                      >
-                        <td>{question.question_index}</td>
-                        <td>{question.correct_choice ?? '—'}</td>
-                        <td>{choice || '—'}</td>
-                        <td>{status === 'correct' ? 'D' : status === 'wrong' ? 'Y' : 'B'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
-        ) : null}
+          ) : null}
+          <button type="button" className="demo-btn" onClick={() => onMarkExternal(rowKey, true)}>
+            Dışarıdan katılıyor
+          </button>
+        </div>
       </div>
     </details>
   );
@@ -171,20 +106,23 @@ export default function OgrenciImportOnayDialog({
   questions = [],
   students = [],
   questionCount = 0,
-  studentFilter,
-  onStudentFilterChange,
   expandedRows,
   onToggleRow,
   onAssignStudent,
   onConfirmRow,
   onMarkExternal,
+  onUndoDecision,
   saving = false,
   onCancel,
   onConfirm,
 }) {
+  const pendingRows = useMemo(() => studentPreview.filter(rowNeedsDecision), [studentPreview]);
+  const decidedRows = useMemo(() => studentPreview.filter((row) => row.decision), [studentPreview]);
   const importCount = studentPreview.filter((row) => row.student_id && !row.external).length;
-  const externalCount = studentPreview.filter((row) => row.external).length;
-  const pendingCount = studentPreview.filter(rowNeedsDecision).length;
+  const autoCount = studentPreview.filter(
+    (row) => row.student_id && !row.external && !row.decision && !rowNeedsDecision(row)
+  ).length;
+  const pendingCount = pendingRows.length;
 
   const usedStudentIds = useMemo(
     () =>
@@ -193,16 +131,6 @@ export default function OgrenciImportOnayDialog({
       ),
     [studentPreview]
   );
-
-  const filteredPreview = useMemo(() => {
-    if (studentFilter === 'matched') {
-      return studentPreview.filter((row) => row.student_id && !row.external);
-    }
-    if (studentFilter === 'issues') {
-      return studentPreview.filter(rowNeedsDecision);
-    }
-    return studentPreview;
-  }, [studentPreview, studentFilter]);
 
   if (!open) return null;
 
@@ -219,38 +147,22 @@ export default function OgrenciImportOnayDialog({
           Öğrenci cevaplarını onayla
         </h2>
         <p className="app-dialog__lead">
-          {questionCount || questions.length} soru · {importCount} aktarılacak
-          {pendingCount ? ` · ${pendingCount} karar bekliyor` : ''}
-          {externalCount ? ` · ${externalCount} dışarıdan katılıyor` : ''}. Eşleşmeyen veya
-          tahminle eşleşen öğrenciler için öğrenciyi seçin/onaylayın ya da «Dışarıdan katılıyor»
-          deyin. Bu kararlar sonraki denemelere taşınmaz.
+          {questionCount || questions.length} soru · {autoCount} öğrenci otomatik eşleşti.{' '}
+          {pendingCount
+            ? `${pendingCount} satır için karar verin: öğrenciyi seçin/onaylayın ya da «Dışarıdan katılıyor» deyin. Bu kararlar sonraki denemelere taşınmaz.`
+            : 'Tüm kararlar verildi.'}
         </p>
 
-        <div className="exam-student-review__filters" role="group" aria-label="Öğrenci filtresi">
-          {[
-            { id: 'all', label: 'Tümü' },
-            { id: 'matched', label: 'Aktarılacaklar' },
-            { id: 'issues', label: 'Karar bekleyen' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`cur-assign-chip${studentFilter === item.id ? ' cur-assign-chip--active' : ''}`}
-              onClick={() => onStudentFilterChange(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
         <div className="exam-import-review-dialog__list">
-          {filteredPreview.length === 0 ? (
-            <p className="dash-hint exam-import-review-dialog__empty">Bu filtrede öğrenci yok.</p>
+          {pendingCount === 0 ? (
+            <p className="dash-hint exam-import-review-dialog__empty">
+              Bekleyen karar yok. {importCount} öğrenci içe aktarılacak.
+            </p>
           ) : (
-            filteredPreview.map((row) => {
+            pendingRows.map((row) => {
               const rowKey = rowKeyOf(row);
               return (
-                <StudentReviewRow
+                <PendingRow
                   key={rowKey}
                   row={row}
                   questions={questions}
@@ -265,13 +177,36 @@ export default function OgrenciImportOnayDialog({
               );
             })
           )}
-        </div>
 
-        <p className="dash-hint exam-import-review-dialog__progress">
-          {pendingCount
-            ? `${pendingCount} satır için karar verin`
-            : `${importCount} öğrenci aktarılacak`}
-        </p>
+          {decidedRows.length ? (
+            <div className="exam-import-decided">
+              <p className="exam-import-decided__title">Verilen kararlar</p>
+              <ul className="exam-import-decided__list">
+                {decidedRows.map((row) => {
+                  const rowKey = rowKeyOf(row);
+                  return (
+                    <li key={rowKey} className="exam-import-decided__item">
+                      <span className="exam-import-decided__text">
+                        <strong>{row.student_name || row.studentName}</strong>
+                        <span className="dash-hint">
+                          {row.decision === 'external' ? '' : '→ '}
+                          {decisionText(row)}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="demo-btn demo-btn--ghost"
+                        onClick={() => onUndoDecision(rowKey)}
+                      >
+                        Geri al
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+        </div>
 
         <div className="app-dialog__actions">
           <button type="button" className="demo-btn demo-btn--ghost" disabled={saving} onClick={onCancel}>
@@ -287,7 +222,7 @@ export default function OgrenciImportOnayDialog({
               ? 'Aktarılıyor…'
               : pendingCount
                 ? `${pendingCount} karar bekliyor`
-                : `${importCount} öğrenciyi onayla ve içe aktar`}
+                : `${importCount} öğrenciyi içe aktar`}
           </button>
         </div>
       </div>

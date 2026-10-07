@@ -150,38 +150,6 @@ export function parseAnswerKeyCsv(text) {
   return { questions, warnings };
 }
 
-export function buildAnswerKeyTemplateCsv(questionCount = 90) {
-  const headers = ['question_index', 'subject_code', 'correct_choice', 'topic_label'];
-  const lines = [headers.join(',')];
-
-  let globalIndex = 0;
-  for (const subject of LGS_SUBJECTS) {
-    for (let i = 1; i <= subject.questions; i += 1) {
-      globalIndex += 1;
-      if (globalIndex > questionCount) break;
-      lines.push(
-        [globalIndex, subject.code, 'A', `${subject.label} örnek konu`].join(',')
-      );
-    }
-    if (globalIndex >= questionCount) break;
-  }
-
-  return `\uFEFF${lines.join('\n')}`;
-}
-
-export function downloadAnswerKeyTemplate(questionCount = 90) {
-  const csv = buildAnswerKeyTemplateCsv(questionCount);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'cevap-anahtari-sablonu.csv';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
 export function emptyQuestionsFromSubjects() {
   const rows = [];
   let globalIndex = 0;

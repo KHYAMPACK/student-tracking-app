@@ -8377,6 +8377,121 @@ body {
   font-size: 0.8125rem;
 }
 
+.exam-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.exam-upload-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.25rem 1rem;
+  border: 2px dashed color-mix(in srgb, var(--theme-primary) 35%, var(--theme-accent-border));
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--theme-secondary) 14%, var(--bg-card));
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.exam-upload-drop:hover,
+.exam-upload-drop:focus-within,
+.exam-upload-drop--over {
+  border-color: var(--theme-primary);
+  background: color-mix(in srgb, var(--theme-secondary) 30%, var(--bg-card));
+}
+
+.exam-upload-drop--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.exam-upload-drop__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.exam-upload-drop__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--theme-primary) 14%, var(--bg-card));
+  color: var(--theme-primary);
+}
+
+.exam-upload-drop__title {
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.exam-upload-drop__formats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.exam-upload-drop__chip {
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: var(--pastel-gray);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.exam-upload-drop__button {
+  pointer-events: none;
+}
+
+.exam-upload__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.exam-upload__error {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #b91c1c;
+}
+
+.exam-key-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--pastel-mint) 45%, var(--bg-card));
+  border: 1px solid color-mix(in srgb, var(--theme-accent-border) 60%, transparent);
+}
+
+.exam-key-status__text {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.exam-key-status .demo-btn {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.78rem;
+}
+
 .exam-konu-map-dialog {
   width: min(42rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
@@ -8415,10 +8530,73 @@ body {
   gap: 0.45rem;
   overflow-x: hidden;
   overflow-y: auto;
-  max-height: min(26rem, 55vh);
+  flex: 1 1 auto;
+  min-height: 0;
   margin: 0.75rem 0;
   padding-right: 0.25rem;
   min-width: 0;
+}
+
+.exam-import-review-dialog > .app-dialog__title,
+.exam-import-review-dialog > .app-dialog__lead {
+  flex-shrink: 0;
+}
+
+.exam-import-review-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.exam-import-review-row__actions .demo-btn {
+  flex: 1 1 9rem;
+}
+
+.exam-import-decided {
+  flex: 0 0 auto;
+  margin-top: 0.25rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--dash-border, #e5e7eb);
+}
+
+.exam-import-decided__title {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.exam-import-decided__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.exam-import-decided__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--bg-page, #f8fafc) 70%, white);
+}
+
+.exam-import-decided__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+
+.exam-import-decided__item .demo-btn {
+  flex-shrink: 0;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
 }
 
 .exam-import-review-dialog__progress {
@@ -8437,6 +8615,7 @@ body {
   background: color-mix(in srgb, var(--bg-page, #f8fafc) 35%, white);
   overflow: hidden;
   min-width: 0;
+  flex: 0 0 auto;
 }
 
 .exam-import-review-row--issue {
@@ -9274,6 +9453,7 @@ body {
 .app-dialog__panel.exam-import-review-dialog {
   width: min(42rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   padding: 1.25rem 1.35rem;
 }
 

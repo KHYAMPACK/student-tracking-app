@@ -6,13 +6,9 @@ import {
   loadQuestionsForAnswerKey,
   saveAnswerKeyWithQuestions,
 } from '../../lib/examAnalysis';
-import {
-  downloadAnswerKeyTemplate,
-  parseAnswerKeyCsv,
-} from '../../lib/examAnswerKeyImport';
+import { parseAnswerKeyCsv } from '../../lib/examAnswerKeyImport';
 import { parseAnswerKeyXlsx } from '../../lib/examKeyXlsxImport';
 import {
-  downloadOptikTemplate,
   matchOptikEntriesToStudents,
   parseOptikExamCsv,
   saveOptikImport,
@@ -20,7 +16,10 @@ import {
 import { decodeOptikBytes, parseOptikTxt } from '../../lib/examOptikTxtImport';
 import { matchOptikTxtEntries, rowNeedsDecision } from '../../lib/examNameMatch';
 import { InlineError, SuccessMessage } from '../dashboardUi';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { Icon } from '../ui/Icon';
 import AnswerKeyReviewGrid from './AnswerKeyReviewGrid';
+import ExamUploadDropzone from './ExamUploadDropzone';
 import KonuEslestirmeDialog from './KonuEslestirmeDialog';
 import OgrenciImportOnayDialog from './OgrenciImportOnayDialog';
 import {
@@ -101,11 +100,11 @@ export default function ExamCsvImportWizard({
   const [draftQuestions, setDraftQuestions] = useState([]);
   const [draftWarnings, setDraftWarnings] = useState([]);
   const [keyMeta, setKeyMeta] = useState(null);
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [studentFileWarnings, setStudentFileWarnings] = useState([]);
   const [savedQuestions, setSavedQuestions] = useState([]);
   const [studentPreview, setStudentPreview] = useState([]);
   const [questionCount, setQuestionCount] = useState(0);
-  const [studentFilter, setStudentFilter] = useState('all');
   const [expandedRows, setExpandedRows] = useState(() => new Set());
   const [localAnswerKeyId, setLocalAnswerKeyId] = useState(null);
   const [konuDialogOpen, setKonuDialogOpen] = useState(false);
@@ -148,6 +147,14 @@ export default function ExamCsvImportWizard({
 
   const reviewQuestions = savedQuestions.length ? savedQuestions : draftQuestions;
 
+  // The manual picker lists the exam's grades first-class: students of other grades only
+  // show up when the roster has no grade info at all.
+  const pickerStudents = useMemo(() => {
+    const inGrades = students.filter(
+      (student) => student.grade != null && audienceGrades.includes(student.grade)
+    );
+    return inGrades.length ? inGrades : students;
+  }, [students, audienceGrades]);
   const importCount = studentPreview.filter((row) => row.student_id && !row.external).length;
   const externalCount = studentPreview.filter((row) => row.external).length;
   const pendingCount = studentPreview.filter(rowNeedsDecision).length;
@@ -160,8 +167,7 @@ export default function ExamCsvImportWizard({
     );
   }
 
-  async function handleAnswerKeyFile(event) {
-    const file = event.target.files?.[0];
+  async function handleAnswerKeyFile(file) {
     if (!file) return;
     setError(null);
     setSuccess(null);
@@ -260,8 +266,7 @@ export default function ExamCsvImportWizard({
     }
   }
 
-  async function handleStudentFile(event) {
-    const file = event.target.files?.[0];
+  async function handleStudentFile(file) {
     if (!file || !activeAnswerKeyId) return;
     setError(null);
     setSuccess(null);
@@ -288,8 +293,8 @@ export default function ExamCsvImportWizard({
       }
       setStudentPreview(matched);
       setQuestionCount(columnCount);
-      setExpandedRows(new Set(matched.filter(rowNeedsDecision).map(previewRowKey)));
-      setStudentFilter('all');
+      const firstPending = matched.find(rowNeedsDecision);
+      setExpandedRows(new Set(firstPending ? [previewRowKey(firstPending)] : []));
       setStudentDialogOpen(true);
     } catch (fileError) {
       setError(fileError);
@@ -301,6 +306,28 @@ export default function ExamCsvImportWizard({
     setStudentPreview((current) =>
       current.map((row) => (previewRowKey(row) === rowKey ? { ...row, ...buildPatch(row) } : row))
     );
+  }
+
+  // Only one pending row is open at a time, and resolving a row opens the next pending one,
+  // so the confirm button never gets pushed off screen.
+  function openNextPending(resolvedKey) {
+    const next = studentPreview.find(
+      (row) => previewRowKey(row) !== resolvedKey && rowNeedsDecision(row)
+    );
+    setExpandedRows(new Set(next ? [previewRowKey(next)] : []));
+  }
+
+  function restoreOriginal(row) {
+    const original = row.original ?? {};
+    return {
+      student_id: original.student_id ?? null,
+      matchedStudent: original.matchedStudent ?? null,
+      studentName: original.matchedStudent?.full_name ?? row.student_name ?? row.studentName,
+      matchStatus: original.matchStatus ?? 'unmatched',
+      confirmed: false,
+      external: false,
+      decision: null,
+    };
   }
 
   function handleAssignStudent(rowKey, studentId) {
@@ -315,30 +342,43 @@ export default function ExamCsvImportWizard({
             matchStatus: 'manual',
             confirmed: true,
             external: false,
+            decision: 'assigned',
+            original: row.original ?? {
+              student_id: row.student_id,
+              matchedStudent: row.matchedStudent,
+              matchStatus: row.matchStatus,
+            },
           }
-        : {
-            student_id: null,
-            matchedStudent: null,
-            studentName: row.student_name ?? row.studentName,
-            matchStatus: 'unmatched',
-            confirmed: false,
-          }
+        : restoreOriginal(row)
     );
+    if (student) openNextPending(rowKey);
   }
 
   function handleConfirmRow(rowKey) {
-    patchStudentRow(rowKey, () => ({ confirmed: true }));
+    patchStudentRow(rowKey, () => ({ confirmed: true, decision: 'confirmed' }));
+    openNextPending(rowKey);
   }
 
   function handleMarkExternal(rowKey, external) {
-    patchStudentRow(rowKey, () => ({ external }));
+    patchStudentRow(rowKey, () => ({ external, decision: external ? 'external' : null }));
+    if (external) openNextPending(rowKey);
+  }
+
+  function handleUndoDecision(rowKey) {
+    patchStudentRow(rowKey, (row) => {
+      if (row.decision === 'external') return { external: false, decision: null };
+      if (row.decision === 'confirmed') return { confirmed: false, decision: null };
+      return restoreOriginal(row);
+    });
+    setExpandedRows(new Set([rowKey]));
   }
 
   function handleToggleRow(rowKey, isOpen) {
     setExpandedRows((current) => {
+      if (isOpen) return new Set([rowKey]);
+      if (!current.has(rowKey)) return current;
       const next = new Set(current);
-      if (isOpen) next.add(rowKey);
-      else next.delete(rowKey);
+      next.delete(rowKey);
       return next;
     });
   }
@@ -388,6 +428,7 @@ export default function ExamCsvImportWizard({
   }
 
   function restartAnswerKey() {
+    setRestartConfirmOpen(false);
     setStep('upload-key');
     setDraftQuestions([]);
     setDraftWarnings([]);
@@ -415,15 +456,14 @@ export default function ExamCsvImportWizard({
         open={studentDialogOpen}
         studentPreview={studentPreview}
         questions={reviewQuestions}
-        students={students}
+        students={pickerStudents}
         questionCount={questionCount}
-        studentFilter={studentFilter}
-        onStudentFilterChange={setStudentFilter}
         expandedRows={expandedRows}
         onToggleRow={handleToggleRow}
         onAssignStudent={handleAssignStudent}
         onConfirmRow={handleConfirmRow}
         onMarkExternal={handleMarkExternal}
+        onUndoDecision={handleUndoDecision}
         saving={saving}
         onCancel={() => {
           if (saving) return;
@@ -431,6 +471,24 @@ export default function ExamCsvImportWizard({
         }}
         onConfirm={handleConfirmStudentImport}
       />
+
+      <ConfirmDialog
+        open={restartConfirmOpen}
+        title="Cevap anahtarı yeniden yüklensin mi?"
+        confirmLabel="Evet, yeniden yükle"
+        cancelLabel="Vazgeç"
+        onCancel={() => setRestartConfirmOpen(false)}
+        onConfirm={restartAnswerKey}
+      >
+        <p className="app-dialog__lead">
+          Yeni bir cevap anahtarı yükleyeceksiniz. Yenisini kaydedene kadar mevcut anahtar geçerli
+          kalır.
+        </p>
+        <p className="dash-hint">
+          Yeni anahtar kaydedildiğinde, bu denemeye daha önce yüklenen öğrenci cevaplarını yeni
+          anahtarla yeniden yüklemeniz gerekir.
+        </p>
+      </ConfirmDialog>
 
       <WizardStepIndicator
         currentStep={step}
@@ -462,25 +520,19 @@ export default function ExamCsvImportWizard({
 
       {!complete && step === 'upload-key' ? (
         <div className="exam-import-wizard__step-panel">
-          <h3 className="exam-workspace-block__title">1. Cevap anahtarı</h3>
-          <p className="dash-hint">
-            Yayınevi cevap anahtarını Excel (.xlsx: her ders için A ve B kitapçığı sütunlu) veya CSV
-            (question_index, subject_code, correct_choice, topic_label) olarak yükleyin.
-          </p>
-          <div className="exam-import-wizard__actions">
-            <button type="button" className="demo-btn demo-btn--ghost" onClick={downloadAnswerKeyTemplate}>
-              CSV şablonu indir
-            </button>
+          <div>
+            <h3 className="exam-workspace-block__title">1. Cevap anahtarını yükleyin</h3>
+            <p className="dash-hint">
+              Yayınevinin cevap anahtarı dosyası. Doğru cevaplar, A/B kitapçık sırası ve konular
+              dosyadan okunur; bir sonraki adımda soru listesini kontrol edip kaydedersiniz.
+            </p>
           </div>
-          <label className="dash-label">
-            Cevap anahtarı dosyası
-            <input
-              className="dash-input"
-              type="file"
-              accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              onChange={handleAnswerKeyFile}
-            />
-          </label>
+          <ExamUploadDropzone
+            formats={['Excel (.xlsx)', 'CSV']}
+            extensions={['.xlsx', '.xls', '.csv']}
+            hint="CSV için sütunlar: question_index, subject_code, correct_choice, topic_label"
+            onFile={handleAnswerKeyFile}
+          />
         </div>
       ) : null}
 
@@ -531,34 +583,37 @@ export default function ExamCsvImportWizard({
 
       {!complete && step === 'upload-students' ? (
         <div className="exam-import-wizard__step-panel">
-          <h3 className="exam-workspace-block__title">3. Öğrenci cevapları</h3>
+          <h3 className="exam-workspace-block__title">3. Öğrenci cevaplarını yükleyin</h3>
           {!activeAnswerKeyId ? (
             <p className="dash-hint">Öğrenci cevaplarını yüklemeden önce cevap anahtarını kaydedin.</p>
           ) : (
             <>
-              <p className="dash-hint">
-                Optik okuyucu çıktısı (.txt) veya CSV (okul_no, ad_soyad, s1…s
-                {reviewQuestions.length || 90}). Kitapçık (A/B) otomatik ayrılır. Eşleşmeyen veya
-                tahminle eşleşen öğrenciler için sizden onay istenir; sınava dışarıdan katılanları
-                «Dışarıdan katılıyor» ile atlarsınız (her denemede yeniden sorulur).
-              </p>
-              <div className="exam-import-wizard__actions">
-                <button type="button" className="demo-btn demo-btn--ghost" onClick={downloadOptikTemplate}>
-                  Şablon indir
-                </button>
-                <button type="button" className="demo-btn demo-btn--ghost" onClick={restartAnswerKey}>
+              <div className="exam-key-status">
+                <span className="exam-key-status__text">
+                  <Icon name="check" size={16} />
+                  Cevap anahtarı kaydedildi
+                  {reviewQuestions.length ? ` · ${reviewQuestions.length} soru` : ''}
+                </span>
+                <button
+                  type="button"
+                  className="demo-btn demo-btn--ghost"
+                  onClick={() => setRestartConfirmOpen(true)}
+                >
                   Cevap anahtarını yeniden yükle
                 </button>
               </div>
-              <label className="dash-label">
-                Öğrenci cevapları dosyası
-                <input
-                  className="dash-input"
-                  type="file"
-                  accept=".txt,.csv,text/plain,text/csv"
-                  onChange={handleStudentFile}
-                />
-              </label>
+              <p className="dash-hint">
+                Optik okuyucunun çıktısını yükleyin. A/B kitapçığı otomatik ayrılır ve öğrenciler
+                adlarından eşleştirilir. Eşleşmeyen veya tahminle eşleşen öğrenciler için sizden onay
+                istenir; sınava dışarıdan katılanları «Dışarıdan katılıyor» ile atlarsınız (bu seçim
+                sonraki denemeye taşınmaz).
+              </p>
+              <ExamUploadDropzone
+                formats={['Optik çıktı (.txt)', 'CSV']}
+                extensions={['.txt', '.csv']}
+                hint={`CSV için sütunlar: okul_no, ad_soyad, s1…s${reviewQuestions.length || 90}`}
+                onFile={handleStudentFile}
+              />
               {studentFileWarnings.length ? (
                 <ul className="exam-import-wizard__warnings">
                   {studentFileWarnings.slice(0, 5).map((warning) => (
