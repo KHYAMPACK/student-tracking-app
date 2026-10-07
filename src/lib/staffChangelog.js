@@ -11,6 +11,100 @@ import { normalizeProfileRoles } from './profileRoles';
  */
 export const STAFF_CHANGELOG = [
   {
+    id: '2026-10-07-optik-import',
+    title: 'Denemeye Excel anahtarı ve optik .txt ile sonuç yükleme',
+    publishedOn: '2026-10-07',
+    intro:
+      'Yayınevinin Excel cevap anahtarı ve optik okuyucunun .txt çıktısı artık doğrudan yüklenebilir; CSV’ye çevirmeye gerek yok.',
+    items: [
+      {
+        title: 'Cevap anahtarı Excel (.xlsx)',
+        summary:
+          'Deneme → Cevap anahtarı adımında .xlsx yükleyin. Dersler, A/B kitapçık sırası ve konular okunur; konu adları müfredat ünitelerine otomatik bağlanır, bağlanamayanlar bir kez sorulur ve kaydedilir; sonraki denemelerde aynı konu tekrar sorulmaz. İnkılap konuları da artık müfredata bağlanabilir.',
+        steps: [
+          'Denemeler → ilgili deneme → Cevap anahtarı → .xlsx dosyasını seçin.',
+          'Soru listesini kontrol edip «Onayla ve kaydet»e basın.',
+        ],
+        roles: ['director', 'counselor'],
+      },
+      {
+        title: 'Optik okuyucu .txt',
+        summary:
+          'Öğrenci cevapları .txt olarak yüklenir. A ve B kitapçığı otomatik ayrılır, adlar öğrenci listesiyle eşleştirilir (Türkçe harf, boşluk, eksik ikinci ad ve okunamayan harfler tolere edilir). Tam eşleşenler sorulmadan geçer; eşleşmeyen, tahminle eşleşen veya kitapçığı şüpheli satırlar için sizden karar istenir.',
+        steps: [
+          'Cevap anahtarı kaydedildikten sonra «Öğrenci cevapları» adımında .txt dosyasını seçin.',
+          'Onay ekranında «Karar bekleyen» satırlara bakın: öğrenciyi seçin, «Doğru, onayla» deyin veya «Dışarıdan katılıyor» ile atlayın.',
+          'Bekleyen kalmayınca «Onayla ve içe aktar»a basın.',
+        ],
+        roles: ['director', 'counselor'],
+      },
+      {
+        title: 'Dışarıdan katılan öğrenciler',
+        summary:
+          'Okulda kayıtlı olmayıp sınava dışarıdan katılan öğrenciler «Dışarıdan katılıyor» ile atlanır. Bu karar hatırlanmaz: aynı kişi sonraki denemede yine çıkarsa yeniden sorulur.',
+        roles: ['director', 'counselor'],
+      },
+    ],
+  },
+  {
+    id: '2026-10-07-ozel-ders-saati',
+    title: 'Haftalık programa özel ders saati',
+    publishedOn: '2026-10-07',
+    intro:
+      'Haftalık ders programına artık Soru Çözümü, Ödev gibi kendi etkinliklerinizi de yazabilirsiniz.',
+    items: [
+      {
+        title: 'Özel ders saati ekleme',
+        summary:
+          'Haftalık ders programında bir hücrede «Özel…» seçip etkinliğin adını yazın. Özel saat de 4 ders saatinden birinin yerini alır; veliler programda bu adı görür. Daha önce kullandığınız adlar yazarken öneri olarak çıkar.',
+        steps: [
+          'Haftalık ders programı → şube ve haftayı seçin.',
+          'İlgili hücrede açılır listeden «Özel…» seçin ve adı yazın (ör. Soru Çözümü).',
+          '«Programı kaydet»e basın.',
+        ],
+        roles: ['director', 'counselor'],
+      },
+      {
+        title: 'Yoklama',
+        summary:
+          'Programda özel etkinlik yazan bir saatte öğretmen yine kendi branşıyla yoklama alabilir; «farklı ders» uyarısı çıkmaz ve haftalık program değişmez.',
+        roles: ['director', 'counselor', 'teacher'],
+      },
+    ],
+  },
+  {
+    id: '2026-10-07-yoklama-duzeltme',
+    title: 'Atlas yoklamasını düzeltme',
+    publishedOn: '2026-10-07',
+    intro:
+      'Kaydedilmiş bir ders saatinin yoklamasında hata yaptıysanız artık kendiniz düzeltebilirsiniz.',
+    items: [
+      {
+        title: 'Kayıtlı ders saatini düzeltme',
+        summary:
+          'Ders ekranında kendi kaydettiğiniz ders saati «Düzelt» etiketiyle açılır; kayıtlı Var/Yok bilgisi yüklenir, değiştirip «Yoklamayı güncelle»ye basarsınız. Düzeltme, yoklama girmeyle aynı sürede yapılır: bugün 20:00’a kadar veya bu haftanın önceki okul günleri. Velilere yeni bildirim gitmez. Başka öğretmenin kaydını yalnızca müdür düzeltebilir.',
+        steps: [
+          'Ders sekmesi → şubeyi seçin (geçmiş gün için Bu hafta · telafi → Yoklama gir).',
+          'Üstteki ders saatlerinden «Düzelt» yazan saate dokunun.',
+          'Öğrencilerin Var/Yok durumunu değiştirip «Yoklamayı güncelle»ye basın.',
+        ],
+        roles: ['director', 'teacher'],
+      },
+      {
+        title: 'Soru sonuçları',
+        summary:
+          'Düzeltmede bir öğrenciyi devamsız yaparsanız, o derse girilmiş soru (test) sonucu da silinir. Yeni «Var» yaptığınız öğrencinin sonucunu Sorular sekmesinden girmeniz gerekir.',
+        roles: ['director', 'teacher'],
+      },
+      {
+        title: 'Başkasının kaydı korunuyor',
+        summary:
+          'Dolu bir ders saatine başka bir öğretmen yoklama yazarak eski kaydı artık ezemez; sistem «düzenlenemiyor» hatası verir.',
+        roles: ['director', 'teacher'],
+      },
+    ],
+  },
+  {
     id: '2026-09-18-muhasebe-atlas',
     title: 'Atlas’ta Muhasebe her zaman açık',
     publishedOn: '2026-09-18',
