@@ -26,7 +26,7 @@ export function buildStudentAllExamsReport({
   const exams = [...bySession.values()]
     .sort((a, b) => (a.session.held_on ?? '').localeCompare(b.session.held_on ?? ''))
     .map(({ session, subjects, ranking }, index) => {
-      const summary = summarizeStudentSubjects(subjects);
+      const summary = summarizeStudentSubjects(subjects, session.score_coefficients);
       return {
         order: index + 1,
         title: session.title,
@@ -61,7 +61,11 @@ export function buildStudentAllExamsReport({
       : null,
     lgsScore: null,
   };
-  averages.lgsScore = estimateLgsScore(averages.totalNet);
+  // Her denemenin puanı kendi katsayılarıyla hesaplanmıştır; ortalama puan bunların ortalamasıdır.
+  const examScores = exams.map((e) => Number(e.lgsScore)).filter((score) => Number.isFinite(score));
+  averages.lgsScore = examScores.length
+    ? Math.round((examScores.reduce((a, b) => a + b, 0) / examScores.length) * 100) / 100
+    : estimateLgsScore(averages.totalNet);
 
   return {
     type: 'student_all_exams',

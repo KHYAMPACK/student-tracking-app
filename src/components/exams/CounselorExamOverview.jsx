@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { loadExamSessions } from '../../lib/exams';
 import {
   aggregateClassSubjectAverages,
+  estimateLgsScore,
+  formatLgsScore,
   loadRankingsForSessions,
   loadSubjectResultsForSessions,
 } from '../../lib/lgsExam';
@@ -61,30 +63,30 @@ export default function CounselorExamOverview({ schoolId, students = [], classes
     [rankings, latestSession?.id]
   );
   const classAvgs = useMemo(
-    () => aggregateClassSubjectAverages(latestSessionSubjects, students),
-    [latestSessionSubjects, students]
+    () => aggregateClassSubjectAverages(latestSessionSubjects, students, latestSession?.score_coefficients),
+    [latestSessionSubjects, students, latestSession?.score_coefficients]
   );
 
   const schoolTrend = useMemo(() => {
     const bySession = new Map();
     for (const row of rankings) {
       if (!bySession.has(row.session_id)) {
-        bySession.set(row.session_id, { nets: [], session: row.exam_sessions });
+        bySession.set(row.session_id, { nets: [], scores: [], session: row.exam_sessions });
       }
-      bySession.get(row.session_id).nets.push(Number(row.total_net) || 0);
+      const bucket = bySession.get(row.session_id);
+      bucket.nets.push(Number(row.total_net) || 0);
+      // Puan her denemenin kendi katsayılarıyla hesaplanıp saklanır; ortalaması doğrudan alınır.
+      bucket.scores.push(row.lgs_score != null ? Number(row.lgs_score) : estimateLgsScore(row.total_net));
     }
+    const mean = (values) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
     return [...bySession.entries()]
       .map(([sessionId, bucket]) => {
-        const avg =
-          bucket.nets.length
-            ? bucket.nets.reduce((a, b) => a + b, 0) / bucket.nets.length
-            : 0;
         return {
           sessionId,
           title: bucket.session?.title ?? 'Sınav',
           heldOn: bucket.session?.held_on,
-          totalNet: Math.round(avg * 100) / 100,
-          lgsScore: Math.round((avg * 5.95 + 10) * 100) / 100,
+          totalNet: Math.round(mean(bucket.nets) * 100) / 100,
+          lgsScore: Math.round(mean(bucket.scores) * 100) / 100,
         };
       })
       .sort((a, b) => (a.heldOn ?? '').localeCompare(b.heldOn ?? ''));
@@ -148,8 +150,8 @@ export default function CounselorExamOverview({ schoolId, students = [], classes
                   <li key={row.classId}>
                     <strong>{klass ? formatClassLabel(klass.grade, klass.name) : 'Atanmamış'}</strong>
                     <span className="dash-hint">
-                      {row.studentCount} öğr. · Ort. net {row.totalNet?.toFixed(2)} · LGS{' '}
-                      {row.lgsScore != null ? Math.round(row.lgsScore) : '—'}
+                      {row.studentCount} öğr. · Ort. net {row.totalNet?.toFixed(2)} · Puan{' '}
+                      {formatLgsScore(row.lgsScore)}
                     </span>
                   </li>
                 );

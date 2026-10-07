@@ -32,7 +32,58 @@ export function computeNet(correct, wrong) {
   return Math.round((c - w / 3) * 100) / 100;
 }
 
-/** Tahmini LGS puanı — resmi MEB formülü değildir. */
+/**
+ * Yayınevi puanı: puan = base + Σ (ders neti × katsayı); tam doğru = 500.
+ * Katsayılar deneme başına `exam_sessions.score_coefficients` içinde saklanır; boşsa bunlar kullanılır
+ * (veritabanındaki `exam_default_score_coefficients()` ile aynı olmalı).
+ */
+export const DEFAULT_SCORE_COEFFICIENTS = Object.freeze({
+  base: 200,
+  turkce: 3.9,
+  inkilap: 1.8,
+  din: 1.7,
+  ingilizce: 1.5,
+  matematik: 4.9,
+  fen: 3.7,
+});
+
+export const SCORE_COEFFICIENT_KEYS = ['base', ...LGS_SUBJECTS.map((subject) => subject.code)];
+
+/** Eksik / geçersiz alanlar varsayılanla doldurulur. */
+export function resolveScoreCoefficients(custom) {
+  const resolved = { ...DEFAULT_SCORE_COEFFICIENTS };
+  if (custom && typeof custom === 'object') {
+    for (const key of SCORE_COEFFICIENT_KEYS) {
+      const value = Number(custom[key]);
+      if (custom[key] !== '' && custom[key] != null && Number.isFinite(value) && value >= 0) {
+        resolved[key] = value;
+      }
+    }
+  }
+  return resolved;
+}
+
+/** Ders netlerinden (`[{ subject_code | code, net }]`) puan; hiç net yoksa null. */
+export function computeLgsScore(subjectRows, coefficients) {
+  const coef = resolveScoreCoefficients(coefficients);
+  let any = false;
+  let score = coef.base;
+  for (const row of subjectRows ?? []) {
+    const net = Number(row?.net);
+    if (row?.net == null || row?.net === '' || Number.isNaN(net)) continue;
+    any = true;
+    score += net * (coef[row.subject_code ?? row.code] ?? 0);
+  }
+  return any ? Math.round(score * 1000) / 1000 : null;
+}
+
+/** Puan ekranda yayınevi gibi 2 ondalıkla gösterilir (ör. 452,19). */
+export function formatLgsScore(value) {
+  if (value == null || value === '' || Number.isNaN(Number(value))) return '—';
+  return Number(value).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Ders kırılımı olmayan eski kayıtlar için tahmini puan — resmi formül değildir. */
 export function estimateLgsScore(totalNet) {
   if (totalNet == null || Number.isNaN(Number(totalNet))) return null;
   return Math.round((Number(totalNet) * 5.95 + 10) * 100) / 100;
@@ -93,7 +144,7 @@ export function normalizeSubjectRow(subjectCode, input = {}) {
   };
 }
 
-export function summarizeStudentSubjects(rows) {
+export function summarizeStudentSubjects(rows, coefficients) {
   const subjects = rows ?? [];
   const totalNet = subjects.reduce((sum, row) => sum + (Number(row.net) || 0), 0);
   const totalCorrect = subjects.reduce((sum, row) => sum + (Number(row.correct_count) || 0), 0);
@@ -105,7 +156,7 @@ export function summarizeStudentSubjects(rows) {
     totalCorrect,
     totalWrong,
     totalBlank,
-    lgsScore: estimateLgsScore(roundedNet),
+    lgsScore: computeLgsScore(subjects, coefficients) ?? estimateLgsScore(roundedNet),
   };
 }
 
@@ -245,6 +296,23 @@ export async function computeExamRankings(sessionId) {
   }
 }
 
+/**
+ * Denemenin puan katsayılarını kaydeder ve sıralamayı yeniden hesaplar.
+ * `null` verilirse varsayılan katsayılara döner.
+ */
+export async function saveSessionScoreCoefficients(sessionId, coefficients) {
+  const payload = coefficients == null ? null : resolveScoreCoefficients(coefficients);
+  const { data, error } = await supabase
+    .from('exam_sessions')
+    .update({ score_coefficients: payload })
+    .eq('id', sessionId)
+    .select('id, score_coefficients')
+    .single();
+  if (error) throw error;
+  await computeExamRankings(sessionId);
+  return data;
+}
+
 export function groupSubjectResultsByStudent(rows) {
   const map = new Map();
   for (const row of rows ?? []) {
@@ -291,7 +359,7 @@ export function buildProgressSeries(rankings) {
     }));
 }
 
-export function aggregateClassSubjectAverages(subjectRows, students) {
+export function aggregateClassSubjectAverages(subjectRows, students, coefficients) {
   const byClass = new Map();
   const studentMap = new Map(students.map((s) => [s.id, s]));
 
@@ -343,7 +411,8 @@ export function aggregateClassSubjectAverages(subjectRows, students) {
       studentCount: bucket.studentIds.size,
       subjects: subjectAvgs,
       totalNet: Math.round(totalNet * 100) / 100,
-      lgsScore: estimateLgsScore(totalNet),
+      // Puan ders netlerinde doğrusal olduğundan ortalama netlerden hesaplanan puan = ortalama puan.
+      lgsScore: computeLgsScore(subjectAvgs, coefficients) ?? estimateLgsScore(totalNet),
     };
   });
 }

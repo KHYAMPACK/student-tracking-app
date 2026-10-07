@@ -42,8 +42,12 @@ export function decodeOptikBytes(arrayBuffer) {
   return text.replace(/^﻿/, '');
 }
 
+/** "*" = çift işaretleme; yayınevi bunu boş değil YANLIŞ sayar, bu yüzden korunur. */
+export const DOUBLE_MARK = '*';
+
 function normalizeMark(value) {
   const mark = String(value ?? '').toUpperCase();
+  if (mark === DOUBLE_MARK) return DOUBLE_MARK;
   return /^[A-E]$/.test(mark) ? mark : null;
 }
 
@@ -150,11 +154,12 @@ export function buildOptikEntryChoices(entry, questions) {
   const choices = {};
   let doubleMarks = 0;
   for (const question of questions) {
-    if (rawMarkFor(entry, question, booklet) === '*') doubleMarks += 1;
-    choices[question.question_index] = choiceFor(entry, question, booklet);
+    const choice = choiceFor(entry, question, booklet);
+    if (choice === DOUBLE_MARK) doubleMarks += 1;
+    choices[question.question_index] = choice;
   }
   if (doubleMarks) {
-    notes.push(`${doubleMarks} çift işaretli soru boş sayıldı.`);
+    notes.push(`${doubleMarks} çift işaretli soru yanlış sayıldı.`);
   }
 
   return { booklet, choices, notes, needsReview };

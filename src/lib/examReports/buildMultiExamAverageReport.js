@@ -1,5 +1,9 @@
 import { LGS_SUBJECTS, estimateLgsScore } from '../lgsExam';
 
+function roundScore(value) {
+  return value != null ? Math.round(value * 100) / 100 : null;
+}
+
 export function buildMultiExamAverageReport({
   sessions,
   subjectResults,
@@ -16,6 +20,7 @@ export function buildMultiExamAverageReport({
       student,
       subjects: Object.fromEntries(LGS_SUBJECTS.map((s) => [s.code, { nets: [], correct: [], wrong: [], blank: [], examCount: 0 }])),
       totalNets: [],
+      scores: [],
     });
   }
 
@@ -34,13 +39,17 @@ export function buildMultiExamAverageReport({
   for (const ranking of rankings ?? []) {
     if (!sessionIds.has(ranking.session_id)) continue;
     const bucket = byStudent.get(ranking.student_id);
-    if (bucket) bucket.totalNets.push(Number(ranking.total_net) || 0);
+    if (!bucket) continue;
+    bucket.totalNets.push(Number(ranking.total_net) || 0);
+    // Puan her denemenin kendi katsayılarıyla hesaplanıp saklandığı için ortalaması doğrudan alınır.
+    const score = ranking.lgs_score != null ? Number(ranking.lgs_score) : estimateLgsScore(ranking.total_net);
+    if (score != null) bucket.scores.push(score);
   }
 
   const avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
 
   const rows = [...byStudent.values()]
-    .map(({ student, subjects, totalNets }) => {
+    .map(({ student, subjects, totalNets, scores }) => {
       const subjectAvgs = LGS_SUBJECTS.map((def) => {
         const sub = subjects[def.code];
         return {
@@ -62,11 +71,11 @@ export function buildMultiExamAverageReport({
             : '—',
         subjects: subjectAvgs,
         totalNet: totalNet != null ? Math.round(totalNet * 100) / 100 : null,
-        lgsScore: estimateLgsScore(totalNet),
+        lgsScore: roundScore(avg(scores)),
       };
     })
     .filter((row) => row.totalNet != null)
-    .sort((a, b) => b.totalNet - a.totalNet)
+    .sort((a, b) => (b.lgsScore ?? 0) - (a.lgsScore ?? 0) || b.totalNet - a.totalNet)
     .map((row, index) => ({ ...row, rank: index + 1 }));
 
   const schoolAvgs = LGS_SUBJECTS.map((def) => {
@@ -75,6 +84,10 @@ export function buildMultiExamAverageReport({
     return { ...def, net: net != null ? Math.round(net * 100) / 100 : null };
   });
   const schoolTotal = rows.length ? rows.reduce((s, r) => s + r.totalNet, 0) / rows.length : null;
+  const scoredRows = rows.filter((r) => r.lgsScore != null);
+  const schoolScore = scoredRows.length
+    ? scoredRows.reduce((s, r) => s + r.lgsScore, 0) / scoredRows.length
+    : null;
 
   return {
     type: 'multi_exam_average',
@@ -87,7 +100,7 @@ export function buildMultiExamAverageReport({
     schoolAverages: {
       subjects: schoolAvgs,
       totalNet: schoolTotal != null ? Math.round(schoolTotal * 100) / 100 : null,
-      lgsScore: estimateLgsScore(schoolTotal),
+      lgsScore: roundScore(schoolScore),
     },
     rows,
   };

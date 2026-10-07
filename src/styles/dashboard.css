@@ -8276,6 +8276,25 @@ body {
   margin-top: 0;
 }
 
+.exam-coef {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-top: 0.75rem;
+}
+
+.exam-coef__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.6rem;
+}
+
+.exam-coef__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .exam-workspace-section__body .exam-workspace-block {
   border: none;
   padding: 0;

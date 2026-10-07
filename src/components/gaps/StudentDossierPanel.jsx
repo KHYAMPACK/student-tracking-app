@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import ExamProgressChart from '../exams/ExamProgressChart';
 import { StudentGapPriorityList } from './StudentGapPanel';
-import { LGS_SUBJECTS, subjectByCode } from '../../lib/lgsExam';
+import { LGS_SUBJECTS, formatLgsScore, subjectByCode } from '../../lib/lgsExam';
 import { formatCalendarDateTr } from '../../lib/calendar';
 
 function formatHeldOn(value) {
@@ -545,7 +545,11 @@ function ExamDetailAccordion({ exam }) {
                     <li key={item.questionIndex ?? item.question_id}>
                       Soru {item.questionIndex ?? '—'}
                       <span className="dash-hint">
-                        {item.status === 'blank' ? 'Boş' : `Yanlış (${item.choice ?? '—'})`}
+                        {item.status === 'blank'
+                          ? 'Boş'
+                          : item.choice === '*'
+                            ? 'Yanlış (çift işaret)'
+                            : `Yanlış (${item.choice ?? '—'})`}
                       </span>
                     </li>
                   ))}
@@ -680,9 +684,7 @@ export default function StudentDossierPanel({ dossier, loading, error, ErrorComp
                         <td>
                           {ranking?.total_net != null ? Number(ranking.total_net).toFixed(2) : '—'}
                         </td>
-                        <td>
-                          {ranking?.lgs_score != null ? Math.round(ranking.lgs_score) : '—'}
-                        </td>
+                        <td>{formatLgsScore(ranking?.lgs_score)}</td>
                         <td>{ranking?.school_rank ?? '—'}</td>
                         <td>{ranking?.class_rank ?? '—'}</td>
                       </tr>

@@ -11,6 +11,38 @@ import { normalizeProfileRoles } from './profileRoles';
  */
 export const STAFF_CHANGELOG = [
   {
+    id: '2026-10-07-puan-hesabi',
+    title: 'Deneme puanı yayınevi puanıyla aynı hesaplanıyor',
+    publishedOn: '2026-10-07',
+    intro:
+      'Net ve sıralama hesabı yayınevinin sonuç listesiyle karşılaştırılıp düzeltildi; artık LGS puanı da yayınevi katsayılarıyla hesaplanıyor.',
+    items: [
+      {
+        title: 'LGS puanı ve puana göre sıralama',
+        summary:
+          'Puan, ders netleri katsayılarla çarpılarak hesaplanır (varsayılan: 200 + Türkçe 3,9 + İnkılap 1,8 + Din 1,7 + İngilizce 1,5 + Matematik 4,9 + Fen 3,7; tam doğru 500 puan). Sıralama artık nete değil puana göre yapılır, puanlar eşitse net bakılır. Puan ekranlarda yayınevi gibi iki ondalıkla gösterilir; eski «tahmini» puan yalnızca ders dökümü olmayan eski kayıtlarda kalır.',
+        roles: ['director', 'counselor'],
+      },
+      {
+        title: 'Deneme başına puan katsayıları',
+        summary:
+          'Başka bir yayınevinin katsayıları farklıysa denemeyi açıp «Puan katsayıları» bölümünden değiştirin; kaydedince o denemenin puanları ve sıralaması yeniden hesaplanır. «Varsayılana dön» ile ilk haline dönersiniz.',
+        steps: [
+          'Denemeler → ilgili deneme → Puan katsayıları.',
+          'Taban puan ve ders katsayılarını girin.',
+          '«Kaydet ve yeniden hesapla»ya basın.',
+        ],
+        roles: ['director', 'counselor'],
+      },
+      {
+        title: 'Çift işaretli soru yanlış sayılır',
+        summary:
+          'Optik okuyucuda bir soruya iki şık işaretlenmişse (*) yayınevi bunu boş değil yanlış sayar; artık biz de yanlış sayıyoruz. Yüklemede kaç çift işaretli soru olduğu not olarak yazar. Genel net de ders netlerinin toplamı olarak gösterilir, böylece onay ekranındaki net yayınevi listesiyle aynı çıkar.',
+        roles: ['director', 'counselor'],
+      },
+    ],
+  },
+  {
     id: '2026-10-07-konu-kodlari',
     title: 'Deneme konuları kazanım kodundan otomatik belirlenir',
     publishedOn: '2026-10-07',

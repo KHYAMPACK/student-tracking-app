@@ -12,6 +12,7 @@ import {
 } from '../../lib/exams';
 import {
   aggregateClassSubjectAverages,
+  formatLgsScore,
   loadSessionRankings,
   loadSubjectResults,
 } from '../../lib/lgsExam';
@@ -26,6 +27,7 @@ import ExamManualEntry from './ExamManualEntry';
 import CreateMockExamForm from './CreateMockExamForm';
 import ExamRankingTable from './ExamRankingTable';
 import ExamReportsPanel from './ExamReportsPanel';
+import ExamScoreCoefficients from './ExamScoreCoefficients';
 import SearchFilterToolbar from '../ui/SearchFilterToolbar';
 
 function ExamSessionWorkspace({
@@ -40,6 +42,7 @@ function ExamSessionWorkspace({
   classAvgs,
   onResultsSaved,
   onAnswerKeySaved,
+  onCoefficientsSaved,
 }) {
   const [tab, setTab] = useState('');
 
@@ -100,8 +103,7 @@ function ExamSessionWorkspace({
                     <li key={row.classId}>
                       <strong>{row.studentCount} öğrenci</strong>
                       <span className="dash-hint">
-                        Ort. net {row.totalNet?.toFixed(2)} · LGS{' '}
-                        {row.lgsScore != null ? Math.round(row.lgsScore) : '—'}
+                        Ort. net {row.totalNet?.toFixed(2)} · Puan {formatLgsScore(row.lgsScore)}
                       </span>
                     </li>
                   ))}
@@ -117,6 +119,16 @@ function ExamSessionWorkspace({
           <DirectorExamAnalysis embedded session={session} classStudentIds={students.map((s) => s.id)} />
         ) : null}
       </div>
+
+      <details className="exam-workspace-section">
+        <summary className="exam-workspace-section__summary">
+          <span className="exam-workspace-section__title">Puan katsayıları</span>
+          <span className="exam-workspace-section__hint">Yayınevi puanı için ders katsayıları</span>
+        </summary>
+        <div className="exam-workspace-section__body">
+          <ExamScoreCoefficients session={session} onSaved={onCoefficientsSaved} />
+        </div>
+      </details>
 
       <details className="exam-workspace-section">
         <summary className="exam-workspace-section__summary">
@@ -302,9 +314,10 @@ export default function ExamOperationsPanel({
     })();
   }, [selectedSessionId]);
 
+  const selectedCoefficients = sessions.find((row) => row.id === selectedSessionId)?.score_coefficients;
   const classAvgs = useMemo(
-    () => aggregateClassSubjectAverages(subjectResults, students),
-    [subjectResults, students]
+    () => aggregateClassSubjectAverages(subjectResults, students, selectedCoefficients),
+    [subjectResults, students, selectedCoefficients]
   );
 
   async function refreshSessionStats(sessionId) {
@@ -519,6 +532,16 @@ export default function ExamOperationsPanel({
                         classAvgs={classAvgs}
                         onResultsSaved={() => refreshSessionStats(session.id)}
                         onAnswerKeySaved={handleAnswerKeySaved}
+                        onCoefficientsSaved={async (saved) => {
+                          setSessions((prev) =>
+                            prev.map((row) =>
+                              row.id === session.id
+                                ? { ...row, score_coefficients: saved?.score_coefficients ?? null }
+                                : row
+                            )
+                          );
+                          await refreshSessionStats(session.id);
+                        }}
                       />
                     </div>
                   ) : null}

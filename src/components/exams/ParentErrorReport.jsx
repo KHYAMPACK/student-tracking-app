@@ -70,7 +70,11 @@ export default function ParentErrorReport({ session, studentId }) {
                 <li key={item.questionIndex}>
                   Soru {item.questionIndex}
                   <span className="dash-hint">
-                    {item.status === 'blank' ? 'Boş' : `Yanlış (${item.choice})`}
+                    {item.status === 'blank'
+                      ? 'Boş'
+                      : item.choice === '*'
+                        ? 'Yanlış (çift işaret)'
+                        : `Yanlış (${item.choice})`}
                   </span>
                 </li>
               ))}

@@ -105,13 +105,15 @@ export function buildQuestionFrequencyReport({ questions, answers, classStudentI
   return (questions ?? []).map((question) => {
     const rows = filtered.filter((a) => a.question_id === question.id);
     const total = rows.length || 1;
-    const distribution = { A: 0, B: 0, C: 0, D: 0, E: 0, blank: 0 };
+    const distribution = { A: 0, B: 0, C: 0, D: 0, E: 0, blank: 0, double: 0 };
     let correct = 0;
 
     for (const row of rows) {
       const choice = row.choice;
       if (!choice) {
         distribution.blank += 1;
+      } else if (choice === '*') {
+        distribution.double += 1;
       } else if (distribution[choice] != null) {
         distribution[choice] += 1;
       }

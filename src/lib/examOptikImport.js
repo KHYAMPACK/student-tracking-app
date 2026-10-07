@@ -8,6 +8,7 @@ const CHOICE_PATTERN = /^[A-Ea-e]$/;
 function normalizeChoice(value) {
   const raw = String(value ?? '').trim().toUpperCase();
   if (!raw || raw === '-' || raw === '0' || raw === 'X') return null;
+  if (raw === '*') return raw;
   if (CHOICE_PATTERN.test(raw)) return raw;
   return null;
 }
@@ -90,9 +91,12 @@ export function previewOptikEntryStats(entry, questions) {
     { correct: 0, wrong: 0, blank: 0 }
   );
 
+  // Genel net, ders netlerinin (2 haneye yuvarlanmış) toplamıdır; yayınevi de böyle hesaplar.
+  const totalNet = Math.round(subjects.reduce((sum, row) => sum + row.net, 0) * 100) / 100;
+
   return {
     subjects,
-    totalNet: computeNet(totals.correct, totals.wrong),
+    totalNet,
     totalCorrect: totals.correct,
     totalWrong: totals.wrong,
     totalBlank: totals.blank,

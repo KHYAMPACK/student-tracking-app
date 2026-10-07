@@ -1,4 +1,5 @@
 import { formatClassLabel } from '../../lib/curriculum';
+import { formatLgsScore } from '../../lib/lgsExam';
 
 export default function ExamRankingTable({ rows = [], students = [], classes = [], showClass = true }) {
   const studentMap = new Map(students.map((s) => [s.id, s]));
@@ -17,7 +18,7 @@ export default function ExamRankingTable({ rows = [], students = [], classes = [
             <th>Öğrenci</th>
             {showClass ? <th>Şube</th> : null}
             <th>Net</th>
-            <th>LGS (tah.)</th>
+            <th>Puan</th>
             <th>Sınıf</th>
           </tr>
         </thead>
@@ -33,7 +34,7 @@ export default function ExamRankingTable({ rows = [], students = [], classes = [
                   <td>{klass ? formatClassLabel(klass.grade, klass.name) : '—'}</td>
                 ) : null}
                 <td>{row.total_net != null ? Number(row.total_net).toFixed(2) : '—'}</td>
-                <td>{row.lgs_score != null ? Number(row.lgs_score).toFixed(0) : '—'}</td>
+                <td>{formatLgsScore(row.lgs_score)}</td>
                 <td>{row.class_rank ?? '—'}</td>
               </tr>
             );

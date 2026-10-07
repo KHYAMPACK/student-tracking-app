@@ -13,7 +13,7 @@ import { readExamDemoConfig } from './examDemoConfig.js';
 
 export const EXAM_CALENDAR_SELECT = `${CALENDAR_SELECT}, exam_kind, exam_subject, exam_term, exam_round`;
 export const SESSION_SELECT =
-  'id, school_id, kind, calendar_event_id, title, held_on, audience_grades, publisher, results_enabled, published_at, answer_key_id, created_at, updated_at';
+  'id, school_id, kind, calendar_event_id, title, held_on, audience_grades, publisher, results_enabled, published_at, answer_key_id, score_coefficients, created_at, updated_at';
 export const RESULT_SELECT = 'id, session_id, student_id, subject, net, score, note, updated_at';
 
 export const EXAM_KIND = {

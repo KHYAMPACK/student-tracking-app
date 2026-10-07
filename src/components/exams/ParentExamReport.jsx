@@ -4,6 +4,7 @@ import { formatClassLabel } from '../../lib/curriculum';
 import {
   buildProgressSeries,
   buildStudentExamCard,
+  formatLgsScore,
   LGS_SUBJECTS,
 } from '../../lib/lgsExam';
 import {
@@ -102,7 +103,7 @@ export default function ParentExamReport({ student, klass, subjectResults, ranki
         <section className="dash-card exam-parent-report__trend">
           <h4 className="dash-section-title">Gelişim</h4>
           <ExamProgressChart series={progressSeries} />
-          <p className="dash-hint">LGS puanları tahminidir.</p>
+          <p className="dash-hint">Puan, okulun deneme için belirlediği ders katsayılarıyla hesaplanır.</p>
         </section>
       ) : null}
 
@@ -120,7 +121,7 @@ export default function ParentExamReport({ student, klass, subjectResults, ranki
               </div>
               <div className="exam-report-card__scores">
                 <span>Net {card.totalNet?.toFixed?.(2) ?? card.totalNet}</span>
-                <span>LGS {card.lgsScore != null ? Math.round(card.lgsScore) : '—'}</span>
+                <span>Puan {formatLgsScore(card.lgsScore)}</span>
               </div>
             </div>
 

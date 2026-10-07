@@ -1,4 +1,9 @@
-import { LGS_SUBJECTS, aggregateClassSubjectAverages, estimateLgsScore, summarizeStudentSubjects } from '../lgsExam';
+import {
+  LGS_SUBJECTS,
+  aggregateClassSubjectAverages,
+  computeLgsScore,
+  summarizeStudentSubjects,
+} from '../lgsExam';
 
 export function buildClassAverageReport({
   session,
@@ -8,10 +13,11 @@ export function buildClassAverageReport({
   rankings,
   schoolName,
 }) {
-  const classAvgs = aggregateClassSubjectAverages(subjectResults, students);
+  const coefficients = session?.score_coefficients;
+  const classAvgs = aggregateClassSubjectAverages(subjectResults, students, coefficients);
   const classMap = new Map((classes ?? []).map((c) => [c.id, c]));
 
-  const schoolSummary = summarizeStudentSubjects(subjectResults);
+  const schoolSummary = summarizeStudentSubjects(subjectResults, coefficients);
   const participantCount = new Set(subjectResults.map((r) => r.student_id)).size;
 
   const classRows = classAvgs
@@ -35,8 +41,16 @@ export function buildClassAverageReport({
         avgSchoolRank,
       };
     })
-    .sort((a, b) => b.totalNet - a.totalNet)
+    .sort((a, b) => (b.lgsScore ?? 0) - (a.lgsScore ?? 0) || b.totalNet - a.totalNet)
     .map((row, index) => ({ ...row, rank: index + 1 }));
+
+  const schoolSubjectAverages = LGS_SUBJECTS.map((def) => {
+    const nets = subjectResults
+      .filter((r) => r.subject_code === def.code)
+      .map((r) => Number(r.net) || 0);
+    const avg = nets.length ? nets.reduce((a, b) => a + b, 0) / nets.length : null;
+    return { ...def, net: avg != null ? Math.round(avg * 100) / 100 : null };
+  });
 
   return {
     type: 'class_average',
@@ -45,19 +59,11 @@ export function buildClassAverageReport({
     sessionDate: session?.held_on,
     participantCount,
     schoolAverages: {
-      subjects: LGS_SUBJECTS.map((def) => {
-        const nets = subjectResults
-          .filter((r) => r.subject_code === def.code)
-          .map((r) => Number(r.net) || 0);
-        const avg = nets.length ? nets.reduce((a, b) => a + b, 0) / nets.length : null;
-        return { ...def, net: avg != null ? Math.round(avg * 100) / 100 : null };
-      }),
+      subjects: schoolSubjectAverages,
       totalNet: schoolSummary.totalNet
-        ? Math.round((subjectResults.reduce((s, r) => s + (Number(r.net) || 0), 0) / Math.max(participantCount * LGS_SUBJECTS.length, 1)) * LGS_SUBJECTS.length * 100) / 100
+        ? Math.round((subjectResults.reduce((s, r) => s + (Number(r.net) || 0), 0) / Math.max(participantCount, 1)) * 100) / 100
         : null,
-      lgsScore: estimateLgsScore(
-        subjectResults.reduce((s, r) => s + (Number(r.net) || 0), 0) / Math.max(participantCount, 1)
-      ),
+      lgsScore: computeLgsScore(schoolSubjectAverages, coefficients),
     },
     classRows,
   };
