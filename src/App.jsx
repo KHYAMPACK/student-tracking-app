@@ -15,6 +15,7 @@ import {
   OfflineBanner,
 } from './components/dashboardUi';
 import { USER_ROLES } from './lib/roles';
+import { Icon } from './components/ui/Icon';
 import StaffWhatsNewHost from './components/StaffWhatsNewHost';
 import { PwaInstallAuthButton, PwaInstallProvider } from './components/PwaInstallHost';
 
@@ -22,6 +23,7 @@ function AuthScreen() {
   const { tenant, tenantSchoolId } = useTenant();
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [authSubmitting, setAuthSubmitting] = useState(false);
 
@@ -96,18 +98,29 @@ function AuthScreen() {
 
               <label className="auth-label">
                 PIN
-                <input
-                  className="auth-input"
-                  type="password"
-                  inputMode="numeric"
-                  pattern="\d{6}"
-                  maxLength={6}
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  required
-                  autoComplete="current-password"
-                  placeholder="••••••"
-                />
+                <span className="auth-input-wrap">
+                  <input
+                    className="auth-input auth-input--with-toggle"
+                    type={showPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    required
+                    autoComplete="current-password"
+                    placeholder="••••••"
+                  />
+                  <button
+                    type="button"
+                    className="auth-input-toggle"
+                    onClick={() => setShowPin((visible) => !visible)}
+                    aria-label={showPin ? 'PIN’i gizle' : 'PIN’i göster'}
+                    aria-pressed={showPin}
+                  >
+                    <Icon name={showPin ? 'eye-off' : 'eye'} size={20} />
+                  </button>
+                </span>
                 <span className="auth-hint">Okul yönetiminizden aldığınız 6 haneli PIN.</span>
               </label>
 

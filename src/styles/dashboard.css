@@ -1162,6 +1162,24 @@ body {
   }
 }
 
+/* Button that is waiting on the server: spinner + label, not clickable again. */
+.demo-btn--busy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.demo-btn--busy .dash-spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+}
+
+.demo-btn--busy:disabled {
+  cursor: wait;
+}
+
 .student-pill-list,
 .history-list {
   list-style: none;
@@ -1610,6 +1628,47 @@ body {
   outline: none;
   border-color: var(--pastel-send);
   box-shadow: 0 0 0 3px rgba(196, 181, 253, 0.35);
+}
+
+.auth-input-wrap {
+  position: relative;
+  display: flex;
+}
+
+.auth-input-wrap .auth-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.auth-input--with-toggle {
+  padding-right: 3rem;
+}
+
+.auth-input-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.auth-input-toggle:hover {
+  background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
+  color: var(--text-primary);
+}
+
+.auth-input-toggle:focus-visible {
+  outline: 2px solid var(--pastel-send);
+  outline-offset: 1px;
 }
 
 .auth-input--code {

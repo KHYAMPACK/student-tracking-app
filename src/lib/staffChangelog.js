@@ -11,6 +11,25 @@ import { normalizeProfileRoles } from './profileRoles';
  */
 export const STAFF_CHANGELOG = [
   {
+    id: '2026-10-07-giris-yayin',
+    title: 'PIN göster/gizle ve «Velilere aç» geri bildirimi',
+    publishedOn: '2026-10-07',
+    intro: 'Giriş ekranına PIN göster düğmesi eklendi; deneme sonuçlarını velilere açarken artık bekleme göstergesi var.',
+    items: [
+      {
+        title: 'PIN’i göster / gizle',
+        summary:
+          'Giriş ekranında PIN alanının sağındaki göz simgesine dokunarak yazdığınız PIN’i görebilir, tekrar dokunarak gizleyebilirsiniz.',
+      },
+      {
+        title: '«Velilere aç» artık yüklendiğini gösteriyor',
+        summary:
+          'Denemeler → «Velilere aç» (veya «Yayını kaldır») düğmesine bastığınızda düğme dönen bir göstergeyle «Velilere açılıyor…» yazar ve bitene kadar tekrar basılamaz. Velilere bildirim gönderilirken birkaç saniye sürebilir. İşlem bitince açık olan deneme kapanmaz.',
+        roles: ['director', 'counselor'],
+      },
+    ],
+  },
+  {
     id: '2026-10-07-sekme-yenileme',
     title: 'Sekme değiştirince uygulama artık yenilenmiyor',
     publishedOn: '2026-10-07',

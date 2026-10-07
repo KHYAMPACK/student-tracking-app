@@ -238,6 +238,7 @@ export default function ExamOperationsPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [publishingId, setPublishingId] = useState(null);
   const [search, setSearch] = useState('');
   const [publisherFilter, setPublisherFilter] = useState('');
   const [gradeFilter, setGradeFilter] = useState(null);
@@ -334,9 +335,12 @@ export default function ExamOperationsPanel({
   }
 
   async function handlePublish(sessionId, publish) {
+    if (publishingId) return;
+    setPublishingId(sessionId);
     setError(null);
+    setSuccess(null);
     try {
-      await publishExamSession(sessionId, publish);
+      const updated = await publishExamSession(sessionId, publish);
       const session = sessions.find((row) => row.id === sessionId);
       if (publish) {
         try {
@@ -353,10 +357,13 @@ export default function ExamOperationsPanel({
           targetId: sessionId,
         });
       }
-      await load();
+      // Update just this row; reloading the whole list would flash "Yükleniyor…" and close the open exam.
+      setSessions((current) => current.map((row) => (row.id === sessionId ? { ...row, ...updated } : row)));
       setSuccess(publish ? 'Sonuçlar velilere açıldı.' : 'Yayın geri alındı.');
     } catch (publishError) {
       setError(publishError);
+    } finally {
+      setPublishingId(null);
     }
   }
 
@@ -510,10 +517,21 @@ export default function ExamOperationsPanel({
                       </button>
                       <button
                         type="button"
-                        className="demo-btn"
+                        className={`demo-btn${publishingId === session.id ? ' demo-btn--busy' : ''}`}
                         onClick={() => handlePublish(session.id, !session.published_at)}
+                        disabled={Boolean(publishingId)}
+                        aria-busy={publishingId === session.id}
                       >
-                        {session.published_at ? 'Yayını kaldır' : 'Velilere aç'}
+                        {publishingId === session.id ? (
+                          <>
+                            <span className="dash-spinner" aria-hidden="true" />
+                            {session.published_at ? 'Kaldırılıyor…' : 'Velilere açılıyor…'}
+                          </>
+                        ) : session.published_at ? (
+                          'Yayını kaldır'
+                        ) : (
+                          'Velilere aç'
+                        )}
                       </button>
                     </div>
                   </div>
