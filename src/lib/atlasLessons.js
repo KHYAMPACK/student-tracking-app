@@ -145,6 +145,11 @@ export async function saveAtlasLessonAttendance({
   return data;
 }
 
+export async function deleteAtlasLessonSession(sessionId) {
+  const { error } = await supabase.rpc('delete_atlas_lesson_session', { p_session_id: sessionId });
+  if (error) throw error;
+}
+
 export async function saveAtlasLessonActivity({
   sessionId,
   lessonType,

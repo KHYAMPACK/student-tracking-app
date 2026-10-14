@@ -13592,3 +13592,21 @@ select.xl-cell--locked:disabled {
 .class-homework-item__main p {
   margin: 0;
 }
+
+.atlas-delete-link {
+  justify-self: center;
+  align-self: center;
+  margin-top: 1.25rem;
+  padding: 0.35rem 0.6rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #9ca3af);
+  font: inherit;
+  font-size: 0.75rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.atlas-delete-link:hover:not(:disabled) {
+  color: #be185d;
+}

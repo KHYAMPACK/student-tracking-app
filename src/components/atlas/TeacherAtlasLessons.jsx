@@ -19,6 +19,7 @@ import {
   canLiveLogForDate,
   canLogAtlasSession,
   loadAtlasAttendanceForSessions,
+  deleteAtlasLessonSession,
   loadClassRoster,
   loadClassSessionsForDate,
   loadTeacherWeekSessions,
@@ -222,6 +223,8 @@ export default function TeacherAtlasLessons({
   const [success, setSuccess] = useState(null);
   const [localCatchUp, setLocalCatchUp] = useState(null);
   const [mismatchConfirmOpen, setMismatchConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const effectiveCatchUp = catchUpPreset ?? localCatchUp;
   const klass = classes.find((row) => row.id === selectedClassId) ?? null;
@@ -491,6 +494,33 @@ export default function TeacherAtlasLessons({
     setAbsentIds(new Set());
     const next = nextEmptySlotIndex([...filledSlots, slotIndex]);
     if (next) setSlotIndex(next);
+  }
+
+  async function performDeleteSession() {
+    if (!correctionSession || !klass?.id || !sessionDate || deleting) return;
+    setDeleting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await deleteAtlasLessonSession(correctionSession.id);
+      recordSchoolActivity(supabase, profile, {
+        schoolId,
+        category: 'atlas',
+        action: 'deleted',
+        summary: `Atlas ders yoklaması silindi: ${formatClassLabel(klass?.grade, klass?.name)} · ${slotIndex}. ders`,
+        metadata: { sessionId: correctionSession.id, sessionDate, slotIndex },
+      });
+      setDeleteConfirmOpen(false);
+      setSessionId(null);
+      setAbsentIds(new Set());
+      await refreshClassSessions(klass.id, sessionDate);
+      setSuccess('Yoklama silindi. Bu ders saati için yeniden yoklama alabilirsiniz.');
+    } catch (deleteError) {
+      setDeleteConfirmOpen(false);
+      setError(deleteError);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function performSaveCorrection() {
@@ -848,7 +878,39 @@ export default function TeacherAtlasLessons({
             sendingLabel={isCorrection ? 'Güncelleniyor…' : 'Kaydediliyor…'}
           />
         )}
+        {isCorrection ? (
+          <button
+            type="button"
+            className="atlas-delete-link"
+            disabled={saving || deleting}
+            onClick={() => setDeleteConfirmOpen(true)}
+          >
+            Bu yoklamayı sil
+          </button>
+        ) : null}
       </form>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Yoklamayı sil"
+        confirmLabel="Sil"
+        cancelLabel="Vazgeç"
+        danger
+        confirming={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteConfirmOpen(false);
+        }}
+        onConfirm={performDeleteSession}
+      >
+        <p className="app-dialog__lead">
+          {formatClassLabel(klass?.grade, klass?.name)} · {slotIndex}. ders yoklaması silinecek.
+          Bu işlem geri alınamaz.
+        </p>
+        <p className="dash-hint">
+          Bu derse ait yoklama kayıtları{correctionSession?.activity_completed_at ? ', soru sonuçları ve öğrenci notları' : ''}{' '}
+          da silinir. Silince bu ders saati boş kalır ve yeniden yoklama alabilirsiniz.
+        </p>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={mismatchConfirmOpen}

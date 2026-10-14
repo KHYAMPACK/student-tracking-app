@@ -17,6 +17,12 @@ export const STAFF_CHANGELOG = [
     intro: 'Soru girişine veliye görünen kısa not, haftalık programa Rehberlik ve yoklamada programı güncelleme eklendi.',
     items: [
       {
+        title: 'Yanlış alınan yoklamayı silme',
+        summary:
+          'Kendi aldığınız bir yoklamayı düzeltme süresi içinde (aynı gün 20:00’a kadar veya haftanın önceki okul günleri) silebilirsiniz: Ders → ilgili ders saati → sayfanın en altındaki küçük «Bu yoklamayı sil» bağlantısı. Yanlışlıkla basılmasın diye onay ister; silince o derse ait yoklama ve varsa soru sonuçları ile öğrenci notları da gider, ders saati boş kalır ve yeniden yoklama alabilirsiniz. Müdür her yoklamayı silebilir.',
+        roles: ['director', 'teacher'],
+      },
+      {
         title: 'Birden fazla sınıfa ödev',
         summary:
           'Duyurular sekmesinin üstündeki «Sınıfa ödev ver» bölümünden bir veya birden fazla şube (ör. 7-A, 7-B, 6-A) seçip ders, başlık, açıklama ve isteğe bağlı teslim tarihiyle ödev verebilirsiniz. İstediğiniz şubeye verebilirsiniz. Veliler Haftalık özette görür ve hemen bildirim alır; veliler ödevi değiştiremez. «Verdiğim ödevler» listesinden silebilirsiniz; müdür tüm ödevleri görür.',
