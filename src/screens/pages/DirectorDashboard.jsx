@@ -20,6 +20,7 @@ import {
 } from '../../lib/announcements';
 import { TEACHER_BRANCH_DEFS, teacherBranchBySlug } from '../../lib/teacherBranches';
 import TeacherAnnouncements from '../../components/announcements/TeacherAnnouncements';
+import ParentAdoptionPanel from '../../components/director/ParentAdoptionPanel';
 import AcademicCalendar from '../../components/calendar/AcademicCalendar';
 import DirectorCurriculum from '../../components/curriculum/DirectorCurriculum';
 import ClassWeekTimetableEditor from '../../components/curriculum/ClassWeekTimetableEditor';
@@ -586,6 +587,8 @@ function TeacherManagementTab({
 }
 
 function ParentManagementTab({
+  school,
+  classes = [],
   parents,
   students,
   links,
@@ -637,6 +640,14 @@ function ParentManagementTab({
     <section className="director-panel director-panel--simple">
       {staffError && <InlineError error={staffError} context="general" />}
       {staffSuccess && <SuccessMessage message={staffSuccess} />}
+
+      <ParentAdoptionPanel
+        school={school}
+        classes={classes}
+        parents={parents}
+        students={students}
+        links={links}
+      />
 
       <details className="cal-collapsible-form dash-card">
         <summary className="cal-collapsible-form__summary">
@@ -2370,6 +2381,8 @@ export default function DirectorDashboard({ profile, schoolId, onSignOut }) {
 
         {activeTab === 'parents' && (
           <ParentManagementTab
+            school={school}
+            classes={classes}
             parents={parents}
             students={students}
             links={links}

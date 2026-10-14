@@ -13610,3 +13610,60 @@ select.xl-cell--locked:disabled {
 .atlas-delete-link:hover:not(:disabled) {
   color: #be185d;
 }
+
+.parent-adoption__body {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.parent-adoption__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.parent-adoption__kpi {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--theme-accent-soft, #eef2ff);
+}
+
+.parent-adoption__kpi strong {
+  font-size: 1.35rem;
+}
+
+.parent-adoption__kpi span {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.parent-adoption__kpi--warn {
+  background: #fef3c7;
+}
+
+.parent-adoption__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.parent-adoption__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.parent-adoption__card {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed var(--text-muted, #9ca3af);
+  border-radius: 0.75rem;
+}
+
+.parent-adoption__pin {
+  font-size: 1.4rem;
+  letter-spacing: 0.2em;
+}

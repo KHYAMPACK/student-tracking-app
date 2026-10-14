@@ -17,6 +17,13 @@ export const STAFF_CHANGELOG = [
     intro: 'Soru girişine veliye görünen kısa not, haftalık programa Rehberlik ve yoklamada programı güncelleme eklendi.',
     items: [
       {
+        title: 'Veli katılımı ve giriş kartları',
+        summary:
+          'Yönetim → Veli Yönetimi’nin en üstünde «Veli katılımı» bölümü var: kaç veli hiç giriş yapmadı, son 14 günde kaç veli aktif, kaç velinin bildirimi açık ve hangi öğrencilerin velisi yok görürsünüz. Listeden bir velinin «Giriş kartı»nı açıp WhatsApp ile gönderebilir ya da metni kopyalayabilirsiniz; birden fazla veli seçip kesilebilir giriş kartlarını (sayfada 8 kart) PDF olarak indirip veli toplantısında dağıtabilirsiniz. PIN’i kayıtlı olmayan velilerde önce «PIN Sıfırla» yapın.',
+        steps: ['Yönetim → Veli Yönetimi → Veli katılımı.', '«Hiç giriş yapmayan» filtresinde velileri seçin.', '«Giriş kartlarını PDF indir»e basın.'],
+        roles: ['director'],
+      },
+      {
         title: 'Yanlış alınan yoklamayı silme',
         summary:
           'Kendi aldığınız bir yoklamayı düzeltme süresi içinde (aynı gün 20:00’a kadar veya haftanın önceki okul günleri) silebilirsiniz: Ders → ilgili ders saati → sayfanın en altındaki küçük «Bu yoklamayı sil» bağlantısı. Yanlışlıkla basılmasın diye onay ister; silince o derse ait yoklama ve varsa soru sonuçları ile öğrenci notları da gider, ders saati boş kalır ve yeniden yoklama alabilirsiniz. Müdür her yoklamayı silebilir.',
