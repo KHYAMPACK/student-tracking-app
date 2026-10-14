@@ -81,7 +81,7 @@ export async function deleteClassHomeworkBatch(batchId) {
 }
 
 export async function notifyClassHomework({ batchId, schoolId }) {
-  const response = await fetch('/api/class-homework-notify', {
+  const response = await fetch('/api/homework-notify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ batchId, schoolId }),

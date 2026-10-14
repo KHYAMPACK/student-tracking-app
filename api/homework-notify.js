@@ -1,5 +1,6 @@
 import { getSupabaseAdmin, buildPushItems, fetchSubscriptionRows, sendWebPushItems } from './_lib/webPush.js';
 import { buildPushIconUrl, fetchSchoolBrandingById, getRequestOrigin } from './_lib/tenant.js';
+import { notifyClassHomeworkBatch } from './_lib/classHomeworkNotify.js';
 
 const HOMEWORK_KIND = 'homework_assigned';
 
@@ -10,6 +11,11 @@ function childFirstName(fullName) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Free-text class homework (batchId) shares this endpoint to stay under the function limit.
+  if (req.body?.batchId) {
+    return notifyClassHomeworkBatch(req, res);
   }
 
   const { assignmentId, schoolId } = req.body ?? {};

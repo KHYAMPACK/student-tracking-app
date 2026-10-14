@@ -1,5 +1,5 @@
-import { getSupabaseAdmin, buildPushItems, fetchSubscriptionRows, sendWebPushItems } from './_lib/webPush.js';
-import { buildPushIconUrl, fetchSchoolBrandingById, getRequestOrigin } from './_lib/tenant.js';
+import { getSupabaseAdmin, buildPushItems, fetchSubscriptionRows, sendWebPushItems } from './webPush.js';
+import { buildPushIconUrl, fetchSchoolBrandingById, getRequestOrigin } from './tenant.js';
 
 const KIND = 'class_homework';
 
@@ -7,12 +7,12 @@ function childFirstName(fullName) {
   return fullName?.trim().split(/\s+/)[0] ?? 'Çocuğunuz';
 }
 
-/** Notifies the parents of every class that received the homework batch. */
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+/**
+ * Notifies the parents of every class that received the homework batch. Lives in _lib and is
+ * called from homework-notify.js so it does not count as a separate serverless function
+ * (Vercel Hobby allows 12).
+ */
+export async function notifyClassHomeworkBatch(req, res) {
   const { batchId, schoolId } = req.body ?? {};
   if (!batchId || !schoolId) {
     return res.status(400).json({ error: 'batchId and schoolId required' });
