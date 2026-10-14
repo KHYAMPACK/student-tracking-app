@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { formatClassLabel } from '../../lib/curriculum';
 import { formatCalendarDateTr } from '../../lib/calendar';
 import {
@@ -259,7 +260,8 @@ export default function ParentAdoptionPanel({ school, parents, students, classes
         )}
       </div>
 
-      {cardFor ? (
+      {cardFor
+        ? createPortal(
         <div className="app-dialog" role="presentation" onClick={() => setCardFor(null)}>
           <div
             className="app-dialog__panel"
@@ -299,7 +301,10 @@ export default function ParentAdoptionPanel({ school, parents, students, classes
             </div>
           </div>
         </div>
-      ) : null}
+            ,
+            document.body
+          )
+        : null}
     </details>
   );
 }
