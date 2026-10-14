@@ -5,12 +5,18 @@ import { recordSchoolActivity } from '../../lib/activityLog';
 import { formatClassLabel, getTeacherSubjectSlug, getTeacherBransDisplay } from '../../lib/curriculum';
 import {
   academicWeekIndex,
+  buildAttendanceRecords,
+  canCorrectAtlasSession,
+  deleteAtlasLessonSession,
   loadAssessmentTypes,
   loadClassRoster,
   loadSessionDetails,
   loadTeacherWeekQuestionSessions,
   saveAtlasLessonActivity,
+  saveAtlasLessonAttendance,
 } from '../../lib/atlasLessons';
+import { profileHasRole } from '../../lib/profileRoles';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { InlineError, SendButton, SuccessMessage } from '../dashboardUi';
 import { Icon } from '../ui/Icon';
 import { AnimatedView } from '../ui/AnimatedView';
@@ -74,6 +80,9 @@ export default function TeacherAtlasQuestions({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const presentStudents = useMemo(
     () => students.filter((student) => !absentIds.has(student.id)),
@@ -211,6 +220,78 @@ export default function TeacherAtlasQuestions({
     }
   }
 
+  const canCorrect = canCorrectAtlasSession(selectedSession, {
+    profileId: profile.id,
+    isDirector: profileHasRole(profile, 'director'),
+  });
+
+  function toggleAbsent(studentId) {
+    setAbsentIds((current) => {
+      const next = new Set(current);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
+  }
+
+  async function handleUpdateAttendance() {
+    if (!selectedSession?.id || attendanceSaving) return;
+    setAttendanceSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await saveAtlasLessonAttendance({
+        classId: selectedSession.class_id,
+        subjectId: selectedSession.subject_id,
+        sessionDate: selectedSession.session_date,
+        slotIndex: selectedSession.slot_index,
+        weekIndex: selectedSession.week_index,
+        unitId: selectedSession.unit_id,
+        records: buildAttendanceRecords(students, absentIds),
+        sessionId: selectedSession.id,
+      });
+      recordSchoolActivity(supabase, profile, {
+        schoolId,
+        category: 'atlas',
+        action: 'corrected',
+        summary: `Atlas ders yoklaması düzeltildi: ${formatClassLabel(selectedSession.classes?.grade, selectedSession.classes?.name)} · ${selectedSession.slot_index}. ders`,
+        metadata: { sessionId: selectedSession.id },
+      });
+      // Absent students lose their question rows, so reload the form from the saved state.
+      await handleSelectSession(selectedSession);
+      setSuccess('Yoklama güncellendi.');
+    } catch (saveError) {
+      setError(saveError);
+    } finally {
+      setAttendanceSaving(false);
+    }
+  }
+
+  async function handleDeleteSession() {
+    if (!selectedSession?.id || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteAtlasLessonSession(selectedSession.id);
+      recordSchoolActivity(supabase, profile, {
+        schoolId,
+        category: 'atlas',
+        action: 'deleted',
+        summary: `Atlas ders yoklaması silindi: ${formatClassLabel(selectedSession.classes?.grade, selectedSession.classes?.name)} · ${selectedSession.slot_index}. ders`,
+        metadata: { sessionId: selectedSession.id },
+      });
+      setDeleteOpen(false);
+      closeSessionEditor();
+      setSuccess('Yoklama silindi. Ders sekmesinden yeniden yoklama alabilirsiniz.');
+      await refresh();
+    } catch (deleteError) {
+      setDeleteOpen(false);
+      setError(deleteError);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function handleSaveLecture() {
     if (!selectedSession?.id) return;
     setSaving(true);
@@ -322,6 +403,48 @@ export default function TeacherAtlasQuestions({
 
         {error && <InlineError error={error} context="general" />}
         {success && <SuccessMessage message={success} />}
+
+        {canCorrect ? (
+          <details className="dash-card atlas-attendance-manage">
+            <summary className="dash-section-title">Yoklamayı düzenle</summary>
+            <p className="dash-hint">
+              Yanlış işaretlenen öğrenciyi düzeltin. Devamsız yapılan öğrencinin soru sonucu silinir.
+            </p>
+            <ul className="atlas-roster">
+              {students.map((student) => {
+                const absent = absentIds.has(student.id);
+                return (
+                  <li key={student.id}>
+                    <button
+                      type="button"
+                      className={`atlas-roster__btn${absent ? ' atlas-roster__btn--absent' : ''}`}
+                      onClick={() => toggleAbsent(student.id)}
+                    >
+                      <span>{student.full_name}</span>
+                      <span>{absent ? 'Yok' : 'Var'}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <button
+              type="button"
+              className="demo-btn"
+              disabled={attendanceSaving || deleting}
+              onClick={handleUpdateAttendance}
+            >
+              {attendanceSaving ? 'Güncelleniyor…' : 'Yoklamayı güncelle'}
+            </button>
+            <button
+              type="button"
+              className="atlas-delete-link"
+              disabled={attendanceSaving || deleting}
+              onClick={() => setDeleteOpen(true)}
+            >
+              Bu yoklamayı sil
+            </button>
+          </details>
+        ) : null}
 
         <div className="dash-form">
           <h3 className="dash-section-title">Ders türü</h3>
@@ -477,6 +600,26 @@ export default function TeacherAtlasQuestions({
             </form>
           )}
         </div>
+        <ConfirmDialog
+          open={deleteOpen}
+          title="Yoklamayı sil"
+          confirmLabel="Sil"
+          cancelLabel="Vazgeç"
+          danger
+          confirming={deleting}
+          onCancel={() => {
+            if (!deleting) setDeleteOpen(false);
+          }}
+          onConfirm={handleDeleteSession}
+        >
+          <p className="app-dialog__lead">
+            {classLabel} · {selectedSession.slot_index}. ders yoklaması silinecek. Bu işlem geri alınamaz.
+          </p>
+          <p className="dash-hint">
+            Yoklama kayıtları, soru sonuçları ve öğrenci notları da silinir. Ders saati boş kalır; Ders
+            sekmesinden yeniden yoklama alabilirsiniz.
+          </p>
+        </ConfirmDialog>
       </section>
       </AnimatedView>
     );

@@ -210,6 +210,16 @@ export function canLogAtlasSession(sessionDate, calendarEvents = []) {
   return true;
 }
 
+/** Same window as live logging: own (or director) session, this week, until 20:00 if it is today. */
+export function canCorrectAtlasSession(session, { profileId, isDirector = false } = {}) {
+  if (!session?.session_date) return false;
+  if (!isDirector && session.taken_by !== profileId) return false;
+  const today = istanbulDateIso();
+  if (session.session_date > today) return false;
+  if (academicWeekIndex(session.session_date) !== academicWeekIndex(today)) return false;
+  return session.session_date === today ? isAtlasLiveLoggingOpen() : true;
+}
+
 export function schoolDaysInWeek(weekIndex, calendarEvents = [], { maxDate } = {}) {
   const cap = maxDate ?? istanbulDateIso();
   const { start, end } = weekRangeIso(weekIndex);

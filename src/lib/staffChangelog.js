@@ -26,7 +26,7 @@ export const STAFF_CHANGELOG = [
       {
         title: 'Yanlış alınan yoklamayı silme',
         summary:
-          'Kendi aldığınız bir yoklamayı düzeltme süresi içinde (aynı gün 20:00’a kadar veya haftanın önceki okul günleri) silebilirsiniz: Ders → ilgili ders saati → sayfanın en altındaki küçük «Bu yoklamayı sil» bağlantısı. Yanlışlıkla basılmasın diye onay ister; silince o derse ait yoklama ve varsa soru sonuçları ile öğrenci notları da gider, ders saati boş kalır ve yeniden yoklama alabilirsiniz. Müdür her yoklamayı silebilir.',
+          'Kendi aldığınız bir yoklamayı düzeltme süresi içinde (aynı gün 20:00’a kadar veya haftanın önceki okul günleri) silebilirsiniz: Ders → ilgili ders saati → sayfanın en altındaki küçük «Bu yoklamayı sil» bağlantısı. Yanlışlıkla basılmasın diye onay ister; silince o derse ait yoklama ve varsa soru sonuçları ile öğrenci notları da gider, ders saati boş kalır ve yeniden yoklama alabilirsiniz. Müdür her yoklamayı silebilir. Aynı düzeltme ve silme Sorular sekmesinde de var: bir dersi açınca üstteki «Yoklamayı düzenle» bölümünden Var/Yok değiştirebilir veya yoklamayı silebilirsiniz.',
         roles: ['director', 'teacher'],
       },
       {
