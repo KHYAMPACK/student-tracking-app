@@ -11,6 +11,40 @@ import { normalizeProfileRoles } from './profileRoles';
  */
 export const STAFF_CHANGELOG = [
   {
+    id: '2026-10-14-ogretmen-notu-rehberlik',
+    title: 'Öğrenci notu, Rehberlik dersi ve program değiştirme',
+    publishedOn: '2026-10-14',
+    intro: 'Soru girişine veliye görünen kısa not, haftalık programa Rehberlik ve yoklamada programı güncelleme eklendi.',
+    items: [
+      {
+        title: 'Birden fazla sınıfa ödev',
+        summary:
+          'Duyurular sekmesinin üstündeki «Sınıfa ödev ver» bölümünden bir veya birden fazla şube (ör. 7-A, 7-B, 6-A) seçip ders, başlık, açıklama ve isteğe bağlı teslim tarihiyle ödev verebilirsiniz. İstediğiniz şubeye verebilirsiniz. Veliler Haftalık özette görür ve hemen bildirim alır; veliler ödevi değiştiremez. «Verdiğim ödevler» listesinden silebilirsiniz; müdür tüm ödevleri görür.',
+        steps: ['Duyurular → Sınıfa ödev ver.', 'Şubeleri seçin, ders ve başlığı yazın.', '«Ödevi ver»e basın.'],
+        roles: ['director', 'teacher'],
+      },
+      {
+        title: 'Soru girişinde öğrenci notu',
+        summary:
+          'Sorular sekmesinde her öğrencinin altındaki «+ Not ekle» ile en fazla 200 karakterlik isteğe bağlı bir not yazabilirsiniz. Not hemen velinin Haftalık özetinde «Öğretmen notları» altında, gün ve ders adıyla görünür. Notu daha sonra aynı ekrandan düzenleyebilirsiniz.',
+        steps: ['Sorular → dersi seçin.', 'Öğrencinin altında «+ Not ekle»ye dokunup yazın.', '«Soruları kaydet»e basın.'],
+        roles: ['director', 'counselor', 'teacher'],
+      },
+      {
+        title: 'Haftalık programda Rehberlik',
+        summary:
+          'Haftalık ders programında hücreye artık «Rehberlik» seçilebilir. Branşı Rehberlik olan öğretmen, o şubenin Rehberlik saatinde Ders sekmesinden yoklama alabilir. Diğer öğretmenler Rehberlik saatinde kendi branşlarıyla yoklama alabilir; plan değişmez.',
+        roles: ['director', 'counselor', 'teacher'],
+      },
+      {
+        title: 'Yoklama alırken programı değiştirme',
+        summary:
+          'Planlanan dersten farklı bir ders için yoklama alıp onayladığınızda, haftalık programdaki o saat de kendi branşınız olarak güncellenir. «Soru Çözümü», «Ödev» gibi özel saatler ve Rehberlik değişmez. Hata mesajları da artık gerçek nedeni gösteriyor.',
+        roles: ['director', 'counselor', 'teacher'],
+      },
+    ],
+  },
+  {
     id: '2026-10-07-giris-yayin',
     title: 'PIN göster/gizle ve «Velilere aç» geri bildirimi',
     publishedOn: '2026-10-07',

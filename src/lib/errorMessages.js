@@ -274,7 +274,11 @@ function mapPushMessage(raw) {
 export function formatAppError(error, context = 'general') {
   const raw = getRawMessage(error);
 
-  if (isAlreadyFriendly(raw) && !isOffline(error, raw)) {
+  // `raise exception` in our SQL functions (SQLSTATE P0001) carries a message written for the user
+  // (e.g. "Bu şube ve ders için yetkiniz yok…"); show it instead of the generic fallback.
+  const isDeliberateDbMessage = typeof error === 'object' && error?.code === 'P0001' && raw;
+
+  if ((isDeliberateDbMessage || isAlreadyFriendly(raw)) && !isOffline(error, raw)) {
     return {
       type: 'info',
       title: null,

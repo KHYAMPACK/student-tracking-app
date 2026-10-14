@@ -75,12 +75,18 @@ export function getTeacherBransDisplay(profile) {
   };
 }
 
-export async function loadCurriculumSubjects() {
-  const { data, error } = await supabase
+/**
+ * Müfredat subjects. Rehberlik is a lesson (timetable + attendance) but has no müfredat, so it is
+ * left out unless `includeRehberlik` is set (lessons screen, timetable editor).
+ */
+export async function loadCurriculumSubjects({ includeRehberlik = false } = {}) {
+  let query = supabase
     .from('curriculum_subjects')
     .select(SUBJECT_SELECT)
     .order('grade', { ascending: true })
     .order('sort_order', { ascending: true });
+  if (!includeRehberlik) query = query.neq('slug', 'rehberlik');
+  const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
 }
@@ -684,6 +690,7 @@ export async function loadCurriculumCatalog() {
     supabase
       .from('curriculum_subjects')
       .select(SUBJECT_SELECT)
+      .neq('slug', 'rehberlik')
       .order('grade', { ascending: true })
       .order('sort_order', { ascending: true }),
     supabase.from('curriculum_units').select(UNIT_SELECT).order('sort_order', { ascending: true }),

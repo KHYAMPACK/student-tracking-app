@@ -169,12 +169,13 @@ export async function loadCustomTimetableLabels(schoolId) {
   return [...new Set((data ?? []).map((row) => row.custom_label).filter(Boolean))];
 }
 
-export async function fillEmptyTimetableSlot({ classId, weekIndex, weekday, slotIndex }) {
+export async function fillEmptyTimetableSlot({ classId, weekIndex, weekday, slotIndex, overwrite = false }) {
   const { data, error } = await supabase.rpc('fill_empty_timetable_slot', {
     p_class_id: classId,
     p_week_index: weekIndex,
     p_weekday: weekday,
     p_slot_index: slotIndex,
+    p_overwrite: overwrite,
   });
   if (error) throw error;
   return data;

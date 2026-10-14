@@ -26,6 +26,7 @@ import {
 import { InlineError } from '../dashboardUi';
 import { Icon, IconWell } from '../ui/Icon';
 import LatestExamSummary from '../exams/LatestExamSummary';
+import ClassHomeworkCard from '../homework/ClassHomeworkCard';
 import AnimatedBarFill from './AnimatedBarFill';
 import ReportDonut, { reportDonutSegments } from './ReportDonut';
 import { useCountUp, useInView } from '../../lib/motion';
@@ -294,6 +295,27 @@ function AtlasReportHero({ report }) {
           ))}
         </ul>
       ) : null}
+    </section>
+  );
+}
+
+function TeacherNotesPanel({ notes = [] }) {
+  if (!notes.length) return null;
+  return (
+    <section className="week-report__panel">
+      <p className="week-report__label">Öğretmen notları</p>
+      <ul className="week-report__feed">
+        {notes.map((item) => (
+          <li key={item.id} className="week-report__feed-item">
+            <div>
+              <span className="week-report__feed-kicker">
+                {formatCalendarDateTr(item.date)} · {item.subjectName}
+              </span>
+              <p>{item.note}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -584,7 +606,9 @@ function AtlasWeeklyReportCard({ report }) {
     <article className="week-report__child week-report__child--atlas">
       <ReportHeroHeader report={report} />
       <LatestExamSummary studentId={report.student.id} />
+      <ClassHomeworkCard classId={report.student.class_id} />
       <AtlasReportHero report={report} />
+      <TeacherNotesPanel notes={report.teacherNotes} />
       <ReportAttendance presence={report.presence} />
       <AtlasSubjectGrid bySubject={report.bySubject} />
       <ReportTopics report={report} />
@@ -610,6 +634,7 @@ function StandardWeeklyReportCard({ report }) {
     <article className="week-report__child">
       <ReportHeroHeader report={report} />
       <LatestExamSummary studentId={report.student.id} />
+      <ClassHomeworkCard classId={report.student.class_id} />
 
       <div className="week-report__stats">
         {stats.attendancePct != null ? (

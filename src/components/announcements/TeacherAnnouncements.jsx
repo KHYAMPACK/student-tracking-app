@@ -18,6 +18,7 @@ import {
 import { recordSchoolActivity } from '../../lib/activityLog';
 
 import TeacherParentMessages from '../messages/TeacherParentMessages';
+import ClassHomeworkSection from '../homework/ClassHomeworkSection';
 
 export default function TeacherAnnouncements({
   profile,
@@ -271,6 +272,8 @@ export default function TeacherAnnouncements({
           sendingLabel="Kaydediliyor…"
         />
       </form>
+
+      <ClassHomeworkSection profile={profile} schoolId={schoolId} />
 
       <form className="dash-form dash-card" onSubmit={handleSaveAnnouncement}>
         <h2 className="dash-section-title">{editingId ? 'Duyuruyu düzenle' : 'Yeni duyuru'}</h2>

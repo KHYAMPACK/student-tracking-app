@@ -131,6 +131,7 @@ export default function TeacherAtlasQuestions({
               prefilled[result.student_id] = {
                 wrong: String(result.wrong_count ?? 0),
                 blank: String(result.blank_count ?? 0),
+                note: result.teacher_note ?? '',
               };
             }
             setStudentResults(prefilled);
@@ -194,6 +195,7 @@ export default function TeacherAtlasQuestions({
             prefilled[result.student_id] = {
               wrong: String(result.wrong_count ?? 0),
               blank: String(result.blank_count ?? 0),
+              note: result.teacher_note ?? '',
             };
           }
           setStudentResults(prefilled);
@@ -249,6 +251,7 @@ export default function TeacherAtlasQuestions({
           student_id: student.id,
           wrong_count: Number.parseInt(row.wrong, 10) || 0,
           blank_count: Number.parseInt(row.blank, 10) || 0,
+          note: (row.note ?? '').trim(),
         };
       });
       await saveAtlasLessonActivity({
@@ -430,6 +433,38 @@ export default function TeacherAtlasQuestions({
                           />
                         </label>
                       </div>
+                      {row.noteOpen || row.note ? (
+                        <label className="atlas-results-card__note">
+                          <span className="atlas-results-card__label">Not (veliye görünür)</span>
+                          <input
+                            className="dash-input"
+                            type="text"
+                            maxLength={200}
+                            placeholder="İsteğe bağlı kısa not…"
+                            value={row.note ?? ''}
+                            onChange={(event) =>
+                              setStudentResults((current) => ({
+                                ...current,
+                                [student.id]: { ...row, note: event.target.value },
+                              }))
+                            }
+                          />
+                          <span className="dash-hint">{(row.note ?? '').length}/200</span>
+                        </label>
+                      ) : (
+                        <button
+                          type="button"
+                          className="atlas-results-card__note-add"
+                          onClick={() =>
+                            setStudentResults((current) => ({
+                              ...current,
+                              [student.id]: { ...row, noteOpen: true },
+                            }))
+                          }
+                        >
+                          + Not ekle
+                        </button>
+                      )}
                     </li>
                   );
                 })}

@@ -491,8 +491,25 @@ export function buildStudentWeeklyReportAtlas({
   });
   const practiceSessions = classSessions.filter((session) => session.lesson_type === 'practice').length;
 
+  // Optional teacher notes typed on the Sorular screen, newest day first.
+  const sessionById = new Map(classSessions.map((session) => [session.id, session]));
+  const teacherNotes = (atlasResults ?? [])
+    .filter((row) => row.student_id === student.id && row.teacher_note?.trim() && sessionById.has(row.session_id))
+    .map((row) => {
+      const session = sessionById.get(row.session_id);
+      return {
+        id: row.id,
+        date: session.session_date,
+        slot: session.slot_index,
+        subjectName: (subjects ?? []).find((subject) => subject.id === session.subject_id)?.name ?? 'Ders',
+        note: row.teacher_note.trim(),
+      };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date) || b.slot - a.slot);
+
   return {
     ...base,
+    teacherNotes,
     moved: [],
     presence,
     lessonCounts,

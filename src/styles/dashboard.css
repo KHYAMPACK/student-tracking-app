@@ -13557,3 +13557,38 @@ select.xl-cell--locked:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+.atlas-results-card__note {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.atlas-results-card__note-add {
+  margin-top: 0.4rem;
+  padding: 0.25rem 0;
+  border: none;
+  background: transparent;
+  color: var(--theme-primary, #5b21b6);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.class-homework-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.class-homework-item__main {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.class-homework-item__main p {
+  margin: 0;
+}

@@ -246,7 +246,9 @@ export default function TeacherAtlasLessons({
   const slotSubjectSlug = slotSubject.subjectSlug;
   // "Soru Çözümü", "Ödev"… — a free-text cell, not a müfredat subject, so it never counts as
   // a branş mismatch; the teacher still logs attendance under their own branş.
-  const isCustomSlot = isCustomCell(slotSubjectSlug);
+  // A planned Rehberlik hour is handled the same way: other teachers log under their own branş
+  // without touching the plan.
+  const isCustomSlot = isCustomCell(slotSubjectSlug) || slotSubjectSlug === 'rehberlik';
 
   // Own branş, resolved against this class's grade — used to log attendance even when the
   // weekly schedule is empty or planned for a different subject (director/counselor never
@@ -343,7 +345,7 @@ export default function TeacherAtlasLessons({
     try {
       const [allClasses, catalogSubjects, curriculum, eventsRes] = await Promise.all([
         loadSchoolClasses(schoolId),
-        loadCurriculumSubjects(),
+        loadCurriculumSubjects({ includeRehberlik: true }),
         loadCurriculumContext(schoolId),
         withSchoolFilter(
           supabase.from('calendar_events').select(CALENDAR_SELECT),
@@ -583,15 +585,16 @@ export default function TeacherAtlasLessons({
           // Best-effort: attendance already saved either way.
         }
       }
-      if (isEmptySlot) {
+      if (isEmptySlot || isSubjectMismatch) {
         try {
           const row = await fillEmptyTimetableSlot({
             classId: klass.id,
             weekIndex: snapshot.weekIndex,
             weekday: isoWeekday(sessionDate),
             slotIndex,
+            overwrite: isSubjectMismatch,
           });
-          setTimetableRows((current) => [...current, row]);
+          setTimetableRows((current) => [...current.filter((item) => item.id !== row.id), row]);
         } catch {
           // Best-effort: attendance already saved; someone else may have filled the
           // cell in the meantime, or the teacher's branş isn't one of the fixed
@@ -789,7 +792,7 @@ export default function TeacherAtlasLessons({
           ) : isSubjectMismatch ? (
             <p className="dash-hint">
               Bu ders saati normalde {formatTimetableSubject(slotSubjectSlug)}. {ownSubject.name}{' '}
-              olarak yoklama alabilirsiniz; haftalık programdaki plan değişmeden kalır.
+              olarak yoklama alabilirsiniz; kaydettiğinizde haftalık program da {ownSubject.name} olarak güncellenir.
             </p>
           ) : null}
         </>
@@ -862,7 +865,7 @@ export default function TeacherAtlasLessons({
           olarak planlı. Yoklamayı <strong>{ownSubject?.name}</strong> dersi için kaydetmek
           istiyor musunuz?
         </p>
-        <p className="dash-hint">Haftalık programdaki plan değişmeden kalır.</p>
+        <p className="dash-hint">Haftalık program da {ownSubject?.name} olarak güncellenir.</p>
       </ConfirmDialog>
     </section>
     </AnimatedView>

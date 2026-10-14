@@ -30,6 +30,7 @@ import {
 } from './parent/ParentNotifications';
 import ParentTuitionStatus from './parent/ParentTuitionStatus';
 import PushPromptDialog from './parent/PushPromptDialog';
+import ParentWhatsNew from './parent/ParentWhatsNew';
 import {
   CALENDAR_SELECT,
   addDaysIso,
@@ -696,6 +697,8 @@ export default function ParentDashboard({ profile, schoolId, onSignOut }) {
         active={demoNav.tab}
         onChange={demoNav.selectTab}
       />
+
+      <ParentWhatsNew profileId={profile?.id} />
 
       {pushPromptVisible ? (
         <PushPromptDialog

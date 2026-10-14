@@ -84,7 +84,7 @@ export default function ClassWeekTimetableEditor({
       const [rows, sessions, subjectCatalog] = await Promise.all([
         loadTimetableForWeek(schoolId, classId, weekIndex),
         loadAtlasSessionsForWeek(schoolId, weekIndex, classId),
-        loadCurriculumSubjects(),
+        loadCurriculumSubjects({ includeRehberlik: true }),
       ]);
       const plannedGrid = rowsToTimetableGrid(rows);
       setGrid(plannedGrid);

@@ -113,7 +113,7 @@ export function ParentNotificationsView({
         const unread = !item.read_at;
         const studentName =
           item.students?.full_name ?? item.studentName ?? 'Çocuğunuz';
-        const isHomework = item.kind === 'homework_assigned';
+        const isHomework = item.kind === 'homework_assigned' || item.kind === 'class_homework';
         const isTuition =
           item.kind === 'tuition_reminder' || item.kind === 'tuition_overdue';
         const actionLabel = isHomework

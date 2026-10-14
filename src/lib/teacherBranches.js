@@ -13,10 +13,8 @@ export const TEACHER_BRANCH_DEFS = [
 
 export const TEACHER_BRANCH_SLUGS = TEACHER_BRANCH_DEFS.map((row) => row.slug);
 
-/** Subjects that can appear in the weekly class timetable (not Rehberlik). */
-export const TIMETABLE_SUBJECT_DEFS = TEACHER_BRANCH_DEFS.filter(
-  (row) => row.slug !== REHBERLIK_BRANCH_SLUG
-);
+/** Subjects that can appear in the weekly class timetable (Rehberlik included). */
+export const TIMETABLE_SUBJECT_DEFS = TEACHER_BRANCH_DEFS;
 
 export function isRehberlikBranch(slug) {
   return slug === REHBERLIK_BRANCH_SLUG;

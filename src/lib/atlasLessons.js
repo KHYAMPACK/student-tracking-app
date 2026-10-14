@@ -16,7 +16,7 @@ export const SESSION_SELECT =
   'id, school_id, class_id, subject_id, slot_index, session_date, taken_by, week_index, unit_id, lesson_type, assessment_type_id, questions_total, activity_completed_at, activity_dismissed_at, created_at, updated_at';
 
 export const ATTENDANCE_SELECT = 'id, session_id, student_id, status';
-export const RESULT_SELECT = 'id, session_id, student_id, wrong_count, blank_count';
+export const RESULT_SELECT = 'id, session_id, student_id, wrong_count, blank_count, teacher_note';
 
 const NON_SCHOOL_EVENT_TYPES = new Set(['holiday', 'school_end']);
 
